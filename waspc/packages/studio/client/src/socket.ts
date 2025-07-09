@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { io } from "socket.io-client";
 import { Data } from "./types";
 
-export const socket = io("http://localhost:4000");
+export const socket = io("http://localhost:4000", { autoConnect: false });
 
 export function useSocket() {
   const [isConnected, setIsConnected] = useState(false);
@@ -26,6 +26,7 @@ export function useSocket() {
   }
 
   useEffect(() => {
+    socket.connect();
     socket.on("connect", onConnect);
     socket.on("disconnect", onDisconnect);
     socket.on("data", onData);
@@ -33,6 +34,7 @@ export function useSocket() {
       socket.off("data", onData);
       socket.off("connect", onConnect);
       socket.off("disconnect", onDisconnect);
+      socket.disconnect();
     };
   }, []);
 

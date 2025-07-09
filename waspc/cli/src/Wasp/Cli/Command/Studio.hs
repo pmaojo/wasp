@@ -19,10 +19,12 @@ import qualified System.Directory as Dir
 import qualified Wasp.AppSpec as AS
 import qualified Wasp.AppSpec.Api as AS.Api
 import qualified Wasp.AppSpec.App as AS.App
+import qualified Wasp.AppSpec.Crud as AS.Crud
 import qualified Wasp.AppSpec.App.Auth as AS.App.Auth
 import qualified Wasp.AppSpec.Job as AS.Job
 import Wasp.AppSpec.Operation (Operation (..))
 import qualified Wasp.AppSpec.Operation as Operation
+import Wasp.Generator.Crud (crudDeclarationToOperationsList)
 import qualified Wasp.AppSpec.Page as AS.Page
 import qualified Wasp.AppSpec.Route as AS.Route
 import qualified Wasp.AppSpec.Valid as ASV
@@ -130,6 +132,17 @@ makeAppInfoJson waspDir spec = do
                   ]
             )
             (AS.getOperations spec),
+        "cruds"
+          .= map
+            ( \(name, crud) ->
+                object
+                  [ "name" .= name,
+                    "operations"
+                      .= map (show . fst) (crudDeclarationToOperationsList crud),
+                    "entities" .= getLinkedEntitiesData spec (Just [AS.Crud.entity crud])
+                  ]
+            )
+            (AS.getCruds spec),
         "entities"
           .= map
             ( \(name, _entity) -> object ["name" .= name] )

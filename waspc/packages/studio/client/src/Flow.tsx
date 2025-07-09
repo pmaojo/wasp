@@ -13,7 +13,7 @@ import ReactFlow, {
   useNodesState,
   useReactFlow,
 } from "reactflow";
-import { Data } from "./types";
+import { StudioData } from "./types";
 
 import ELK, { type ElkNode } from "elkjs/lib/elk.bundled.js";
 
@@ -90,7 +90,7 @@ const getLayoutedElements = (nodes: Node[], edges: Edge[]) => {
   );
 };
 
-export default function Flow({ data }: { data: Data }) {
+export default function Flow({ data }: { data: StudioData }) {
   // NOTE: This is not used. But it might be useful in the future.
   const [selectedNode] = useState<Node | null>(null);
 

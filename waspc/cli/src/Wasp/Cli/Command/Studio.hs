@@ -8,7 +8,7 @@ where
 import Control.Arrow ()
 import Control.Monad.Except (throwError)
 import Control.Monad.IO.Class (liftIO)
-import Data.Aeson (Value, object, (.=))
+import Data.Aeson (Value, toJSON)
 import Data.Aeson.Encode.Pretty (encodePretty)
 import qualified Data.ByteString.Lazy as BSL
 import Data.Maybe (fromMaybe)
@@ -38,6 +38,7 @@ import Wasp.Project.Common (dotWaspDirInWaspProjectDir, generatedCodeDirInDotWas
 import qualified Wasp.Project.Studio
 import qualified Wasp.Studio.PageOperations as StudioOps
 import qualified Data.HashMap.Strict as M
+import Wasp.Studio.Data
 
 studio :: Command ()
 studio = do
@@ -71,90 +72,84 @@ studio = do
 
 
 makeAppInfoJson :: SP.Path' SP.Abs (SP.Dir WaspProjectDir) -> AS.AppSpec -> IO Data.Aeson.Value
-makeAppInfoJson waspDir spec = do
+makeAppInfoJson waspDir spec = toJSON <$> makeAppInfo waspDir spec
+
+makeAppInfo :: SP.Path' SP.Abs (SP.Dir WaspProjectDir) -> AS.AppSpec -> IO StudioData
+makeAppInfo waspDir spec = do
   let (appName, app) = ASV.getApp spec
   opsRes <- StudioOps.collectPageOperations waspDir spec
   let pageOps = either (const M.empty) id opsRes
-  return $
-    object
-      [ "pages"
-          .= map
-            ( \(name, page) ->
-                object
-                  [ "name" .= name,
-                    "authRequired" .= AS.Page.authRequired page,
-                    "operations" .= M.lookupDefault [] name pageOps
-                  ]
-            )
-            (AS.getPages spec),
-        "routes"
-          .= map
-            ( \(name, route) ->
-                object
-                  [ "name" .= name,
-                    "path" .= AS.Route.path route,
-                    "toPage" .= object ["name" .= fst (AS.resolveRef spec $ AS.Route.to route)]
-                  ]
-            )
-            (AS.getRoutes spec),
-        "apis"
-          .= map
-            ( \(name, api) ->
-                object
-                  [ "name" .= name,
-                    "httpRoute" .=
-                      let (method, path) = AS.Api.httpRoute api
-                       in object ["method" .= show method, "path" .= path],
-                    "auth" .= AS.Api.auth api,
-                    "entities" .= getLinkedEntitiesData spec (AS.Api.entities api)
-                  ]
-            )
-            (AS.getApis spec),
-        "jobs"
-          .= map
-            ( \(name, job) ->
-                object
-                  [ "name" .= name,
-                    "schedule" .= (AS.Job.cron <$> AS.Job.schedule job),
-                    "entities" .= getLinkedEntitiesData spec (AS.Job.entities job)
-                  ]
-            )
-            (AS.getJobs spec),
-        "operations"
-          .= map
-            ( \operation ->
-                object
-                  [ "type" .= case operation of
-                      _op@(QueryOp _ _) -> "query" :: String
-                      _op@(ActionOp _ _) -> "action",
-                    "name" .= Operation.getName operation,
-                    "entities" .= getLinkedEntitiesData spec (Operation.getEntities operation),
-                    "auth" .= Operation.getAuth operation
-                  ]
-            )
-            (AS.getOperations spec),
-        "cruds"
-          .= map
-            ( \(name, crud) ->
-                object
-                  [ "name" .= name,
-                    "operations"
-                      .= map (show . fst) (crudDeclarationToOperationsList crud),
-                    "entities" .= getLinkedEntitiesData spec (Just [AS.Crud.entity crud])
-                  ]
-            )
-            (AS.getCruds spec),
-        "entities"
-          .= map
-            ( \(name, _entity) -> object ["name" .= name] )
-            (AS.getEntities spec),
-        "app"
-          .= object
-            [ "name" .= (appName :: String),
-              "auth" .= getAuthInfo spec app,
-              "db" .= getDbInfo spec
-            ]
-      ]
+  let pages =
+        [ StudioPage
+            { name = name
+            , authRequired = AS.Page.authRequired page
+            , operations = M.lookupDefault [] name pageOps
+            }
+        | (name, page) <- AS.getPages spec
+        ]
+  let routes =
+        [ StudioRoute
+            { name = name
+            , path = AS.Route.path route
+            , toPage = PageRef {name = fst (AS.resolveRef spec $ AS.Route.to route)}
+            }
+        | (name, route) <- AS.getRoutes spec
+        ]
+  let apis =
+        [ StudioApi
+            { name = name
+            , httpRoute =
+                let (method, path) = AS.Api.httpRoute api
+                 in HttpRoute {method = show method, path = path}
+            , auth = AS.Api.auth api
+            , entities = getLinkedEntities spec (AS.Api.entities api)
+            }
+        | (name, api) <- AS.getApis spec
+        ]
+  let jobs =
+        [ StudioJob
+            { name = name
+            , schedule = AS.Job.cron <$> AS.Job.schedule job
+            , entities = getLinkedEntities spec (AS.Job.entities job)
+            }
+        | (name, job) <- AS.getJobs spec
+        ]
+  let operations =
+        [ StudioOperation
+            { type_ = case operation of
+                QueryOp _ _ -> Query
+                ActionOp _ _ -> Action
+            , name = Operation.getName operation
+            , entities = getLinkedEntities spec (Operation.getEntities operation)
+            , auth = Operation.getAuth operation
+            }
+        | operation <- AS.getOperations spec
+        ]
+  let cruds =
+        [ StudioCrud
+            { name = name
+            , operations = map (show . fst) (crudDeclarationToOperationsList crud)
+            , entities = getLinkedEntities spec (Just [AS.Crud.entity crud])
+            }
+        | (name, crud) <- AS.getCruds spec
+        ]
+  let entities =
+        [ StudioEntity {name = name}
+        | (name, _) <- AS.getEntities spec
+        ]
+  authInfo <- getAuthInfoData spec app
+  let appInfo = StudioApp {name = appName, auth = authInfo, db = getDbInfoData spec}
+  return
+    StudioData
+      { pages = pages
+      , routes = routes
+      , apis = apis
+      , jobs = jobs
+      , operations = operations
+      , cruds = cruds
+      , entities = entities
+      , app = appInfo
+      }
 
 -- | Generate the studio data JSON file and return its path.
 generateStudioDataFile :: SP.Path' SP.Abs (SP.Dir WaspProjectDir) -> AS.AppSpec -> IO (SP.Path' SP.Abs SP.File')
@@ -167,24 +162,24 @@ generateStudioDataFile waspDir spec = do
   BSL.writeFile (SP.fromAbsFile filePath) (encodePretty appJson)
   return filePath
 
-getLinkedEntitiesData :: AS.AppSpec -> Maybe [AS.Ref AS.Entity] -> [Data.Aeson.Value]
-getLinkedEntitiesData spec entityRefs =
-  map (\(entityName, _entity) -> object ["name" .= entityName]) $
+getLinkedEntities :: AS.AppSpec -> Maybe [AS.Ref AS.Entity] -> [StudioEntity]
+getLinkedEntities spec entityRefs =
+  map (\(entityName, _entity) -> StudioEntity {name = entityName}) $
     resolveEntities spec entityRefs
 
 resolveEntities :: AS.AppSpec -> Maybe [AS.Ref AS.Entity] -> [(String, AS.Entity)]
 resolveEntities spec entityRefs = AS.resolveRef spec <$> fromMaybe [] entityRefs
 
-getDbInfo :: AS.AppSpec -> Value
-getDbInfo spec = object ["system" .= show (ASV.getValidDbSystem spec)]
+getDbInfoData :: AS.AppSpec -> StudioDb
+getDbInfoData spec = StudioDb {system = show (ASV.getValidDbSystem spec)}
 
-getAuthInfo :: AS.AppSpec -> AS.App.App -> IO Value
-getAuthInfo spec app = do
+getAuthInfoData :: AS.AppSpec -> AS.App.App -> IO StudioAppAuth
+getAuthInfoData spec app = do
   auth <- AS.App.auth app
   let methodNames = enabledAuthMethodNames (AS.App.Auth.methods auth)
-  return $
-    object
-      [ "userEntity" .= object ["name" .= fst (AS.resolveRef spec $ AS.App.Auth.userEntity auth)],
-        "methods" .= methodNames
-      ]
+  return
+    StudioAppAuth
+      { userEntity = StudioEntity {name = fst (AS.resolveRef spec $ AS.App.Auth.userEntity auth)}
+      , methods = methodNames
+      }
 

@@ -23,8 +23,11 @@ import Wasp.AI.GenerateNewProject.Common.Prompts (appDescriptionBlock)
 import qualified Wasp.AI.GenerateNewProject.Common.Prompts as Prompts
 import Wasp.AI.GenerateNewProject.Page (makePageDocPrompt)
 import Wasp.AI.LLM (ChatMessage (..), ChatRole (..))
+import StrongPath (Path', Rel, File')
+import qualified StrongPath as SP
+import Wasp.Project.Common (WaspProjectDir)
 
-fixPageComponent :: NewProjectDetails -> FilePath -> FilePath -> CodeAgent ()
+fixPageComponent :: NewProjectDetails -> Path' (Rel WaspProjectDir) File' -> Path' (Rel WaspProjectDir) File' -> CodeAgent ()
 fixPageComponent newProjectDetails waspFilePath pageComponentPath = do
   currentWaspFileContent <- fromMaybe (error "couldn't find wasp file") <$> getFile waspFilePath
   currentPageComponentContent <- fromMaybe (error "couldn't find page file to fix") <$> getFile pageComponentPath

@@ -24,8 +24,11 @@ import Wasp.AI.GenerateNewProject.Common.Prompts (appDescriptionBlock)
 import qualified Wasp.AI.GenerateNewProject.Common.Prompts as Prompts
 import Wasp.AI.GenerateNewProject.Operation (actionDocPrompt, queryDocPrompt)
 import Wasp.AI.LLM (ChatMessage (..), ChatRole (..))
+import StrongPath (Path', Rel, File')
+import qualified StrongPath as SP
+import Wasp.Project.Common (WaspProjectDir)
 
-fixOperationsJsFile :: NewProjectDetails -> FilePath -> FilePath -> CodeAgent ()
+fixOperationsJsFile :: NewProjectDetails -> Path' (Rel WaspProjectDir) File' -> Path' (Rel WaspProjectDir) File' -> CodeAgent ()
 fixOperationsJsFile newProjectDetails waspFilePath opJsFilePath = do
   currentWaspFileContent <- fromMaybe (error "couldn't find wasp file") <$> getFile waspFilePath
   currentOpJsFileContent <- fromMaybe (error "couldn't find operation js file to fix") <$> getFile opJsFilePath
@@ -102,7 +105,7 @@ fixOperationsJsFile newProjectDetails waspFilePath opJsFilePath = do
         |]
     appDescriptionBlockText = appDescriptionBlock newProjectDetails
     basicWaspLangInfoPrompt = Prompts.basicWaspLangInfo
-    opJsFilePathText = T.pack opJsFilePath
+    opJsFilePathText = T.pack $ SP.toFilePath opJsFilePath
 
 data OperationsJsFile = OperationsJsFile
   { opJsFileContent :: Text

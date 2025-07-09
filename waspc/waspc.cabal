@@ -432,6 +432,8 @@ library
     Wasp.SemanticVersion.VersionBound
     Wasp.SemanticVersion.Version
     Wasp.TypeScript.Inspect.Exports
+    Wasp.TypeScript.Inspect.Operations
+    Wasp.Studio.PageOperations
     Wasp.Util
     Wasp.Util.Aeson
     Wasp.Util.Control.Monad
@@ -704,6 +706,7 @@ test-suite waspc-test
     Paths_waspc
     Generator.NpmDependenciesTest
     JsImportTest
+    StudioDataTest
 
 test-suite waspls-test
   import: common-all, common-exe

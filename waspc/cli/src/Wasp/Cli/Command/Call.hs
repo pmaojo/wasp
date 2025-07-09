@@ -3,14 +3,14 @@ module Wasp.Cli.Command.Call where
 data Call
   = New Arguments
   | NewAi Arguments
-  | Start
+  | Start Bool
   | StartDb
   | Clean
   | Uninstall
   | TsSetup
   | Compile
   | Db Arguments -- db args
-  | Build
+  | Build Bool
   | Version
   | Telemetry
   | Deps

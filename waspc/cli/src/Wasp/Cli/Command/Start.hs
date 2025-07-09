@@ -10,7 +10,7 @@ import Control.Monad.Except (throwError)
 import Control.Monad.IO.Class (liftIO)
 import StrongPath ((</>))
 import Wasp.Cli.Command (Command, CommandError (..))
-import Wasp.Cli.Command.Compile (compile, printWarningsAndErrorsIfAny)
+import Wasp.Cli.Command.Compile (compileWithOptions, defaultCompileOptions, printWarningsAndErrorsIfAny)
 import Wasp.Cli.Command.Message (cliSendMessageC)
 import Wasp.Cli.Command.Require (DbConnectionEstablished (DbConnectionEstablished), FromOutDir (FromOutDir), InWaspProject (InWaspProject), require)
 import Wasp.Cli.Command.Watch (watch)
@@ -21,14 +21,14 @@ import Wasp.Project.Common (dotWaspDirInWaspProjectDir, generatedCodeDirInDotWas
 
 -- | Does initial compile of wasp code and then runs the generated project.
 -- It also listens for any file changes and recompiles and restarts generated project accordingly.
-start :: Command ()
-start = do
+start :: Bool -> Command ()
+start useSsr = do
   InWaspProject waspProjectDir <- require
   let outDir = waspProjectDir </> dotWaspDirInWaspProjectDir </> generatedCodeDirInDotWaspDir
 
   cliSendMessageC $ Msg.Start "Starting compilation and setup phase. Hold tight..."
 
-  warnings <- compile
+  warnings <- compileWithOptions $ (defaultCompileOptions waspProjectDir) { useSsr = useSsr }
 
   DbConnectionEstablished FromOutDir <- require
 

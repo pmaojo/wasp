@@ -49,7 +49,8 @@ main = withUtf8 . (`E.catch` handleInternalErrors) $ do
   let commandCall = case args of
         ("new" : newArgs) -> Command.Call.New newArgs
         ("new:ai" : newAiArgs) -> Command.Call.NewAi newAiArgs
-        ["start"] -> Command.Call.Start
+        ["start"] -> Command.Call.Start False
+        ["start", "--ssr"] -> Command.Call.Start True
         ["start", "db"] -> Command.Call.StartDb
         ["clean"] -> Command.Call.Clean
         ["ts-setup"] -> Command.Call.TsSetup
@@ -57,7 +58,8 @@ main = withUtf8 . (`E.catch` handleInternalErrors) $ do
         ("db" : dbArgs) -> Command.Call.Db dbArgs
         ["uninstall"] -> Command.Call.Uninstall
         ["version"] -> Command.Call.Version
-        ["build"] -> Command.Call.Build
+        ["build"] -> Command.Call.Build False
+        ["build", "--ssr"] -> Command.Call.Build True
         ["telemetry"] -> Command.Call.Telemetry
         ["deps"] -> Command.Call.Deps
         ["dockerfile"] -> Command.Call.Dockerfile
@@ -101,7 +103,7 @@ main = withUtf8 . (`E.catch` handleInternalErrors) $ do
             appDescription
             projectConfigJson
       _unknownCommand -> printWaspNewAiUsage >> exitFailure
-    Command.Call.Start -> runCommand start
+    Command.Call.Start useSsr -> runCommand $ start useSsr
     Command.Call.StartDb -> runCommand Command.Start.Db.start
     Command.Call.Clean -> runCommand clean
     Command.Call.TsSetup -> runCommand tsConfigSetup
@@ -110,7 +112,7 @@ main = withUtf8 . (`E.catch` handleInternalErrors) $ do
     Command.Call.Version -> printVersion
     Command.Call.Studio -> runCommand studio
     Command.Call.Uninstall -> runCommand uninstall
-    Command.Call.Build -> runCommand build
+    Command.Call.Build useSsr -> runCommand $ build useSsr
     Command.Call.Telemetry -> runCommand Telemetry.telemetry
     Command.Call.Deps -> runCommand deps
     Command.Call.Dockerfile -> runCommand printDockerfile

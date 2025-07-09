@@ -60,6 +60,7 @@ spec_WebAppGenerator = do
                   Npm.PackageJson.devDependencies = M.empty
                 },
             AS.isBuild = False,
+            AS.isSSR = False,
             AS.migrationsDir = Nothing,
             AS.devEnvVarsServer = [],
             AS.devEnvVarsClient = [],
@@ -123,6 +124,12 @@ spec_WebAppGenerator = do
               `shouldBe` (dstPath, True)
         )
         expectedFileDraftDstPaths
+
+    it "Generates SSR files when enabled" $ do
+      let specSsr = testAppSpec { AS.isSSR = True }
+          (_, Right ssrFiles) = runGenerator $ genWebApp specSsr
+      existsFdWithDst ssrFiles (SP.toFilePath Common.webAppSrcDirInWebAppRootDir </> "entry-client.tsx") `shouldBe` True
+      existsFdWithDst ssrFiles (SP.toFilePath Common.webAppSrcDirInWebAppRootDir </> "entry-server.tsx") `shouldBe` True
 
 existsFdWithDst :: [FileDraft] -> FilePath -> Bool
 existsFdWithDst fds dstPath = any ((== dstPath) . getFileDraftDstPath) fds

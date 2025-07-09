@@ -9,7 +9,8 @@ import qualified StrongPath as SP
 import Wasp.Cli.Command (Command)
 import Wasp.Cli.Command.Call (Arguments)
 import qualified Wasp.Cli.Command.CreateNewProject.AI as AI
-import Wasp.Cli.Command.CreateNewProject.ArgumentsParser (parseNewProjectArgs)
+import Wasp.Cli.Command.CreateNewProject.ArgumentsParser (parseNewProjectArgs, NewProjectArgs(..))
+import Wasp.AI.Provider (Provider(..))
 import qualified Wasp.Cli.Command.CreateNewProject.Common as Common
 import Wasp.Cli.Command.CreateNewProject.ProjectDescription
   ( NewProjectDescription (..),
@@ -30,16 +31,18 @@ import qualified Wasp.Util.Terminal as Term
 -- | It receives all of the arguments that were passed to the `wasp new` command.
 createNewProject :: Arguments -> Command ()
 createNewProject args = do
-  newProjectArgs <- parseNewProjectArgs args & either Common.throwProjectCreationError return
+  newProjectArgs@NewProjectArgs{_provider = providerArg} <- parseNewProjectArgs args & either Common.throwProjectCreationError return
   let starterTemplates = getStarterTemplates
 
   newProjectDescription <- obtainNewProjectDescription newProjectArgs starterTemplates
 
-  createProjectOnDisk newProjectDescription
+  let provider = maybe OpenAI (\p -> if p == "openai" then OpenAI else OpenAI) providerArg
+
+  createProjectOnDisk provider newProjectDescription
   liftIO $ printGettingStartedInstructionsForProject newProjectDescription
 
-createProjectOnDisk :: NewProjectDescription -> Command ()
-createProjectOnDisk
+createProjectOnDisk :: Provider -> NewProjectDescription -> Command ()
+createProjectOnDisk provider
   NewProjectDescription
     { _projectName = projectName,
       _appName = appName,
@@ -53,7 +56,7 @@ createProjectOnDisk
       LocalStarterTemplate metadata ->
         liftIO $ createProjectOnDiskFromLocalTemplate absWaspProjectDir projectName appName $ _path metadata
       AiGeneratedStarterTemplate ->
-        AI.createNewProjectInteractiveOnDisk absWaspProjectDir appName
+        AI.createNewProjectInteractiveOnDisk provider absWaspProjectDir appName
 
 -- | This function assumes that the project dir was created inside the current working directory.
 printGettingStartedInstructionsForProject :: NewProjectDescription -> IO ()

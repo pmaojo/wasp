@@ -3,15 +3,10 @@
 {-# OPTIONS_GHC -Wno-deprecations #-}
 
 module Wasp.AI.OpenAI.ChatGPT
-  ( queryChatGPT,
+  ( OpenAIProvider (..),
+    queryChatGPT,
     ChatGPTParams (..),
-    Model (..),
-    ChatResponse (..),
-    ChatResponseUsage (..),
-    ChatResponseChoice (..),
-    ChatMessage (..),
-    ChatRole (..),
-    getChatResponseContent,
+    Model (..)
   )
 where
 
@@ -26,10 +21,24 @@ import qualified Data.Text as T
 import GHC.Generics (Generic)
 import qualified Network.HTTP.Conduit as HTTP.C
 import qualified Network.HTTP.Simple as HTTP
+import Wasp.AI.LLM
+  ( ChatMessage (..),
+    ChatResponse,
+    ChatResponseUsage,
+    ChatResponseChoice,
+    LLMProvider (..)
+  )
 import Wasp.AI.OpenAI (OpenAIApiKey)
 import qualified Wasp.Util as Util
 import Wasp.Util.Debug (debugTrace)
 import qualified Wasp.Util.Network.HTTP as Utils.HTTP
+
+-- | OpenAI provider configuration.
+newtype OpenAIProvider = OpenAIProvider {_openAIApiKey :: OpenAIApiKey}
+
+instance LLMProvider OpenAIProvider where
+  type Params OpenAIProvider = ChatGPTParams
+  queryMessages (OpenAIProvider apiKey) = queryChatGPT apiKey
 
 -- | Might throw an HttpException.
 queryChatGPT :: OpenAIApiKey -> ChatGPTParams -> [ChatMessage] -> IO ChatResponse
@@ -65,9 +74,6 @@ queryChatGPT apiKey params requestMessages = do
     $ return ()
 
   return chatResponse
-
-getChatResponseContent :: ChatResponse -> Text
-getChatResponseContent = content . message . head . choices
 
 data ChatGPTParams = ChatGPTParams
   { _model :: !Model,
@@ -113,48 +119,3 @@ instance FromJSON Model where
         models = [minBound .. maxBound]
      in find ((== t') . modelOpenAiId) models
           & maybe (fail $ "Invalid GPT model: " <> t') pure
-
-data ChatResponse = ChatResponse
-  { id :: !String,
-    object :: !String,
-    created :: !Int,
-    model :: !String,
-    choices :: ![ChatResponseChoice],
-    usage :: !ChatResponseUsage
-  }
-  deriving (Generic, Show, FromJSON)
-
-data ChatResponseUsage = ChatResponseUsage
-  { prompt_tokens :: !Int,
-    completion_tokens :: !Int,
-    total_tokens :: !Int
-  }
-  deriving (Generic, Show, FromJSON)
-
-data ChatResponseChoice = ChatResponseChoice
-  { index :: !Int,
-    message :: !ChatMessage,
-    finish_reason :: !String
-  }
-  deriving (Generic, Show, FromJSON)
-
-data ChatMessage = ChatMessage
-  { role :: !ChatRole,
-    content :: !Text
-  }
-  deriving (Generic, Show, ToJSON, FromJSON)
-
-data ChatRole = User | System | Assistant
-  deriving (Generic, Show)
-
-instance ToJSON ChatRole where
-  toJSON User = "user"
-  toJSON System = "system"
-  toJSON Assistant = "assistant"
-
-instance FromJSON ChatRole where
-  parseJSON = Aeson.withText "ChatRole" $ \case
-    "user" -> return User
-    "system" -> return System
-    "assistant" -> return Assistant
-    other -> fail $ "Invalid ChatRole: " <> show other

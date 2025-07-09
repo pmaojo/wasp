@@ -9,7 +9,7 @@ module Wasp.AI.GenerateNewProject.Common
     getProjectAuth,
     getProjectPrimaryColor,
     emptyNewProjectConfig,
-    queryChatGPTForJSON,
+    queryLLMForJSON,
     writeToWaspFileEnd,
     planningChatGPTParams,
     codingChatGPTParams,
@@ -28,7 +28,8 @@ import GHC.Generics (Generic)
 import qualified Wasp.AI.CodeAgent as CA
 import Wasp.AI.GenerateNewProject.LogMsg (LogMsg)
 import qualified Wasp.AI.GenerateNewProject.LogMsg as L
-import Wasp.AI.OpenAI.ChatGPT (ChatGPTParams, ChatMessage)
+import Wasp.AI.LLM (ChatMessage)
+import Wasp.AI.OpenAI.ChatGPT (ChatGPTParams)
 import qualified Wasp.AI.OpenAI.ChatGPT as GPT
 import Wasp.Util (naiveTrimJSON, textToLazyBS)
 
@@ -95,8 +96,8 @@ instance Aeson.FromJSON AuthProvider where
 -- TODO: Make these relative to WaspProjectDir, via StrongPath?
 type File = (FilePath, Text)
 
-queryChatGPTForJSON :: FromJSON a => ChatGPTParams -> [ChatMessage] -> CodeAgent a
-queryChatGPTForJSON chatGPTParams initChatMsgs = doQueryForJSON 0 0 initChatMsgs
+queryLLMForJSON :: FromJSON a => ChatGPTParams -> [ChatMessage] -> CodeAgent a
+queryLLMForJSON chatGPTParams initChatMsgs = doQueryForJSON 0 0 initChatMsgs
   where
     -- Retry logic here got a bit complex, here is a short explanation.
     -- We first try to do normal request, if that fails and returns invalid JSON, we ask chatGPT to
@@ -111,7 +112,7 @@ queryChatGPTForJSON chatGPTParams initChatMsgs = doQueryForJSON 0 0 initChatMsgs
     -- `maxNumFailedRunsBeforeGivingUpCompletely` * `maxNumFailuresPerRunBeforeGivingUpOnARun`.
     doQueryForJSON :: (FromJSON a) => Int -> Int -> [ChatMessage] -> CodeAgent a
     doQueryForJSON numPrevFailedRuns numPrevFailuresPerCurrentRun chatMsgs = do
-      response <- CA.queryChatGPT chatGPTParams chatMsgs
+      response <- CA.queryLLM chatGPTParams chatMsgs
       case Aeson.eitherDecode . textToLazyBS . naiveTrimJSON $ response of
         Right result -> return result
         Left errMsg ->

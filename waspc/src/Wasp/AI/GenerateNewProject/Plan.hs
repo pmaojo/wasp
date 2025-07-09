@@ -27,12 +27,12 @@ import Wasp.AI.GenerateNewProject.Common
     NewProjectDetails (..),
     fixingChatGPTParams,
     planningChatGPTParams,
-    queryChatGPTForJSON,
+    queryLLMForJSON,
   )
 import Wasp.AI.GenerateNewProject.Common.Prompts (appDescriptionBlock)
 import qualified Wasp.AI.GenerateNewProject.Common.Prompts as Prompts
 import qualified Wasp.AI.GenerateNewProject.LogMsg as L
-import Wasp.AI.OpenAI.ChatGPT (ChatMessage (..), ChatRole (..))
+import Wasp.AI.LLM (ChatMessage (..), ChatRole (..))
 import qualified Wasp.Psl.Format as Prisma
 import qualified Wasp.Psl.Parser.Model as Psl.Parser.Model
 import qualified Wasp.Util.Aeson as Util.Aeson
@@ -46,7 +46,7 @@ generatePlan newProjectDetails planRules = do
   writeToLog $
     "\n" <> L.styled L.Generating "Generating" <> " plan (slowest step, can take up to 90 seconds for slower models)"
       <> L.styled (L.Custom [Term.Blink]) "..."
-  initialPlan <- queryChatGPTForJSON (planningChatGPTParams newProjectDetails) chatMessages
+  initialPlan <- queryLLMForJSON (planningChatGPTParams newProjectDetails) chatMessages
   writeToLog $ "Initial plan generated!\n" <> L.fromText (summarizePlan initialPlan)
   writeToLog $ L.styled L.Fixing "Fixing" <> " initial plan..."
   fixedPlan <- fixPlanRepeatedly 3 initialPlan
@@ -178,7 +178,7 @@ generatePlan newProjectDetails planRules = do
                     |]
           writeToLog "Sending plan to GPT for fixing..."
           fixedPlan <-
-            queryChatGPTForJSON (fixingChatGPTParams $ planningChatGPTParams newProjectDetails) $
+            queryLLMForJSON (fixingChatGPTParams $ planningChatGPTParams newProjectDetails) $
               chatMessages
                 <> [ ChatMessage {role = Assistant, content = Util.Aeson.encodeToText plan'},
                      ChatMessage

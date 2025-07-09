@@ -17,19 +17,19 @@ import Wasp.AI.GenerateNewProject.Common
     NewProjectDetails (..),
     codingChatGPTParams,
     fixingChatGPTParams,
-    queryChatGPTForJSON,
+    queryLLMForJSON,
   )
 import Wasp.AI.GenerateNewProject.Common.Prompts (appDescriptionBlock)
 import qualified Wasp.AI.GenerateNewProject.Common.Prompts as Prompts
 import Wasp.AI.GenerateNewProject.Page (makePageDocPrompt)
-import Wasp.AI.OpenAI.ChatGPT (ChatMessage (..), ChatRole (..))
+import Wasp.AI.LLM (ChatMessage (..), ChatRole (..))
 
 fixPageComponent :: NewProjectDetails -> FilePath -> FilePath -> CodeAgent ()
 fixPageComponent newProjectDetails waspFilePath pageComponentPath = do
   currentWaspFileContent <- fromMaybe (error "couldn't find wasp file") <$> getFile waspFilePath
   currentPageComponentContent <- fromMaybe (error "couldn't find page file to fix") <$> getFile pageComponentPath
   fixedPageComponent <-
-    queryChatGPTForJSON
+    queryLLMForJSON
       (fixingChatGPTParams $ codingChatGPTParams newProjectDetails)
       [ ChatMessage {role = System, content = Prompts.systemPrompt},
         ChatMessage {role = User, content = fixPageComponentPrompt currentWaspFileContent currentPageComponentContent}

@@ -17,12 +17,12 @@ import Wasp.AI.GenerateNewProject.Common
     NewProjectDetails,
     codingChatGPTParams,
     fixingChatGPTParams,
-    queryChatGPTForJSON,
+    queryLLMForJSON,
   )
 import Wasp.AI.GenerateNewProject.Common.Prompts (appDescriptionBlock)
 import qualified Wasp.AI.GenerateNewProject.Common.Prompts as Prompts
 import Wasp.AI.GenerateNewProject.Plan (Plan)
-import Wasp.AI.OpenAI.ChatGPT (ChatMessage (..), ChatRole (..))
+import Wasp.AI.LLM (ChatMessage (..), ChatRole (..))
 import Wasp.Analyzer.Parser.Ctx (Ctx (..))
 import Wasp.Project.WaspFile.WaspLang (analyzeWaspFileContent)
 import qualified Wasp.Psl.Ast.Schema as Psl.Schema
@@ -49,7 +49,7 @@ fixWaspFile newProjectDetails waspFilePath plan = do
       case shouldContinueIfCompileErrors of
         OnlyIfCompileErrors | null compileErrors -> return $ FileContent {fileContent = wfContent}
         _otherwise ->
-          queryChatGPTForJSON
+          queryLLMForJSON
             (fixingChatGPTParams $ codingChatGPTParams newProjectDetails)
             [ ChatMessage {role = System, content = Prompts.systemPrompt},
               ChatMessage {role = User, content = fixWaspFilePrompt wfContent compileErrors}

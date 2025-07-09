@@ -241,6 +241,7 @@ library
     Wasp.AppSpec.App.Auth
     Wasp.AppSpec.App.Auth.PasswordReset
     Wasp.AppSpec.App.Auth.EmailVerification
+    Wasp.AppSpec.App.Auth.Util
     Wasp.AppSpec.App.Client
     Wasp.AppSpec.App.Db
     Wasp.AppSpec.App.EmailSender
@@ -707,6 +708,7 @@ test-suite waspc-test
     Generator.NpmDependenciesTest
     JsImportTest
     StudioDataTest
+    AuthMethodsTest
 
 test-suite waspls-test
   import: common-all, common-exe

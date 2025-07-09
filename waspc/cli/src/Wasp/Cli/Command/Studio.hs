@@ -11,7 +11,7 @@ import Control.Monad.IO.Class (liftIO)
 import Data.Aeson (Value, object, (.=))
 import Data.Aeson.Encode.Pretty (encodePretty)
 import qualified Data.ByteString.Lazy as BSL
-import Data.Maybe (fromMaybe, isJust)
+import Data.Maybe (fromMaybe)
 import StrongPath (relfile, (</>))
 import qualified StrongPath as SP
 import StrongPath.Operations ()
@@ -21,6 +21,7 @@ import qualified Wasp.AppSpec.Api as AS.Api
 import qualified Wasp.AppSpec.App as AS.App
 import qualified Wasp.AppSpec.Crud as AS.Crud
 import qualified Wasp.AppSpec.App.Auth as AS.App.Auth
+import Wasp.AppSpec.App.Auth.Util (enabledAuthMethodNames)
 import qualified Wasp.AppSpec.Job as AS.Job
 import Wasp.AppSpec.Operation (Operation (..))
 import qualified Wasp.AppSpec.Operation as Operation
@@ -180,18 +181,10 @@ getDbInfo spec = object ["system" .= show (ASV.getValidDbSystem spec)]
 getAuthInfo :: AS.AppSpec -> AS.App.App -> IO Value
 getAuthInfo spec app = do
   auth <- AS.App.auth app
+  let methodNames = enabledAuthMethodNames (AS.App.Auth.methods auth)
   return $
     object
       [ "userEntity" .= object ["name" .= fst (AS.resolveRef spec $ AS.App.Auth.userEntity auth)],
-        "methods"
-          .= let methods = AS.App.Auth.methods auth
-                 mk name f = [name | isJust (f methods)]
-             in mk "usernameAndPassword" AS.App.Auth.usernameAndPassword
-                ++ mk "slack" AS.App.Auth.slack
-                ++ mk "discord" AS.App.Auth.discord
-                ++ mk "google" AS.App.Auth.google
-                ++ mk "keycloak" AS.App.Auth.keycloak
-                ++ mk "gitHub" AS.App.Auth.gitHub
-                ++ mk "email" AS.App.Auth.email
+        "methods" .= methodNames
       ]
 

@@ -1,8 +1,7 @@
 module StudioDataTest where
 
 import Control.Monad (void)
-import Data.Aeson (FromJSON, decode)
-import GHC.Generics (Generic)
+import Data.Aeson (decode)
 import qualified Data.ByteString.Lazy as BSL
 import Data.List (find)
 import Data.Maybe (fromJust, fromMaybe)
@@ -15,28 +14,7 @@ import qualified Wasp.Project.Analyze as Analyze
 import Wasp.Project.Common (WaspProjectDir)
 import qualified Wasp.Util.IO as IO
 import Fixtures (systemSPRoot)
-
-data StudioData = StudioData
-  { pages :: [StudioPage],
-    cruds :: Maybe [StudioCrud]
-  }
-  deriving (Generic, Show)
-instance FromJSON StudioData
-
-data StudioPage = StudioPage {pageName :: String, operations :: [String]} deriving (Generic, Show)
-instance FromJSON StudioPage
-
-data StudioCrud = StudioCrud
-  { crudName :: String,
-    crudOperations :: [String],
-    crudEntities :: [StudioEntity]
-  }
-  deriving (Generic, Show)
-instance FromJSON StudioCrud
-
-newtype StudioEntity = StudioEntity {entityName :: String}
-  deriving (Generic, Show)
-instance FromJSON StudioEntity
+import Wasp.Studio.Data
 
 spec_StudioDataTest :: Spec
 spec_StudioDataTest = describe "generateStudioDataFile" $ do
@@ -54,9 +32,10 @@ spec_StudioDataTest = describe "generateStudioDataFile" $ do
           bs <- BSL.readFile (SP.fromAbsFile dataFile)
           case decode bs :: Maybe StudioData of
             Nothing -> expectationFailure "failed to decode json"
-            Just (StudioData ps _) -> do
-                let ops = fromMaybe [] $ operations <$> find ((== "MainPage") . pageName) ps
-                ops `shouldBe` ["getTasks"]
+            Just studioData -> do
+              let ops =
+                    fromMaybe [] $ operations <$> find ((== "MainPage") . name) (pages studioData)
+              ops `shouldBe` ["getTasks"]
 
   it "includes CRUD info for tasks" $
     withSystemTempDirectory "studio-crud-test" $ \tmp -> do
@@ -72,13 +51,11 @@ spec_StudioDataTest = describe "generateStudioDataFile" $ do
           bs <- BSL.readFile (SP.fromAbsFile dataFile)
           case decode bs :: Maybe StudioData of
             Nothing -> expectationFailure "failed to decode json"
-            Just (StudioData _ (Just crs)) -> do
-              let findCrud c = if crudName c == "tasks" then Just c else Nothing
-              case find (\c -> crudName c == "tasks") crs of
+            Just studioData -> do
+              case find ((== "tasks") . name) (cruds studioData) of
                 Nothing -> expectationFailure "tasks crud not found"
                 Just c -> do
-                  crudOperations c `shouldBe` ["Get","GetAll","Create","Update","Delete"]
-                  fmap entityName (crudEntities c) `shouldBe` ["Task"]
-            Just (StudioData _ Nothing) -> expectationFailure "cruds missing"
+                  operations c `shouldBe` ["Get", "GetAll", "Create", "Update", "Delete"]
+                  fmap name (entities c) `shouldBe` ["Task"]
 
 

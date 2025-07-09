@@ -1,8 +1,7 @@
 module Cli.StudioTest where
 
 import Control.Monad (void)
-import Data.Aeson (Value(..), decode)
-import qualified Data.HashMap.Strict as HM
+import Data.Aeson (decode)
 import qualified Data.ByteString.Lazy as BSL
 import Data.Maybe (fromJust)
 import qualified StrongPath as SP
@@ -14,6 +13,7 @@ import qualified Wasp.Project.Analyze as Analyze
 import Wasp.Project.Common (WaspProjectDir)
 import qualified Wasp.Util.IO as IO
 import Fixtures (systemSPRoot)
+import Wasp.Studio.Data
 
 spec_CliStudioTest :: Spec
 spec_CliStudioTest =
@@ -32,8 +32,6 @@ spec_CliStudioTest =
             fileExists <- IO.doesFileExist dataFile
             fileExists `shouldBe` True
             bs <- BSL.readFile (SP.fromAbsFile dataFile)
-            case decode bs :: Maybe Value of
-              Just (Object obj) ->
-                let expectedKeys = ["pages", "routes", "operations", "cruds"]
-                 in all (`HM.member` obj) expectedKeys `shouldBe` True
-              _ -> expectationFailure "failed to decode json"
+            case decode bs :: Maybe StudioData of
+              Just _ -> return ()
+              Nothing -> expectationFailure "failed to decode json"

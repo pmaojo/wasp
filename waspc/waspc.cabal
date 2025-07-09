@@ -435,6 +435,7 @@ library
     Wasp.TypeScript.Inspect.Exports
     Wasp.TypeScript.Inspect.Operations
     Wasp.Studio.PageOperations
+    Wasp.Studio.Data
     Wasp.Util
     Wasp.Util.Aeson
     Wasp.Util.Control.Monad

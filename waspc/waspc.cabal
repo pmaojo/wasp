@@ -709,6 +709,7 @@ test-suite waspc-test
     JsImportTest
     StudioDataTest
     AuthMethodsTest
+    Cli.StudioTest
 
 test-suite waspls-test
   import: common-all, common-exe

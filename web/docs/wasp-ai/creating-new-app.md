@@ -13,7 +13,7 @@ Wasp AI allows you to create a new Wasp app **from only a title and a short desc
 There are two main ways to create a new Wasp app with Wasp AI:
 
 1. Free, open-source online app [usemage.ai](https://usemage.ai).
-2. Running `wasp new` on your machine and picking AI generation. For this you need to provide your own OpenAI API keys, but it allows for more flexibility (choosing GPT models).
+2. Running `wasp new` on your machine and picking AI generation. For this you need to provide your own API keys for the chosen provider (e.g. OpenAI), but it allows for more flexibility (choosing GPT models).
 
 They both use the same logic in the background, so both approaches are equally "smart", the difference is just in the UI / settings.
 
@@ -35,9 +35,9 @@ If you want to know more, check this [blog post](/blog/2023/07/10/gpt-web-app-ge
 
 ## Wasp CLI
 
-You can create a new Wasp app using Wasp AI by running `wasp new` in your terminal and picking AI generation.
+You can create a new Wasp app using Wasp AI by running `wasp new` in your terminal and picking AI generation. Use the `--provider` option to select the LLM provider (defaults to `openai`).
 
-If you don't have them set yet, `wasp` will ask you to provide (via ENV vars) your OpenAI API keys (which it will use to query GPT).
+If you don't have them set yet, `wasp` will ask you to provide (via ENV vars) the API keys for the selected provider (which it will use to query GPT).
 
 Then, after providing a title and description for your Wasp app, the new app will be generated on your disk!
 

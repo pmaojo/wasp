@@ -177,6 +177,7 @@ library
     Wasp.AI.GenerateNewProject.PrismaFile
     Wasp.AI.OpenAI
     Wasp.AI.OpenAI.ChatGPT
+    Wasp.AI.Provider
     Wasp.Analyzer
     Wasp.Analyzer.AnalyzeError
     Wasp.Analyzer.ErrorMessage

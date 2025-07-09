@@ -18,6 +18,7 @@ import Wasp.Cli.Command.Clean (clean)
 import Wasp.Cli.Command.Compile (compile)
 import Wasp.Cli.Command.CreateNewProject (createNewProject)
 import qualified Wasp.Cli.Command.CreateNewProject.AI as Command.CreateNewProject.AI
+import qualified Wasp.AI.Provider as Provider
 import Wasp.Cli.Command.Db (runCommandThatRequiresDbRunning)
 import qualified Wasp.Cli.Command.Db.Migrate as Command.Db.Migrate
 import qualified Wasp.Cli.Command.Db.Reset as Command.Db.Reset
@@ -91,12 +92,14 @@ main = withUtf8 . (`E.catch` handleInternalErrors) $ do
       ["--stdout", projectName, appDescription, projectConfigJson] ->
         runCommand $
           Command.CreateNewProject.AI.createNewProjectNonInteractiveToStdout
+            Provider.OpenAI
             projectName
             appDescription
             projectConfigJson
       [projectName, appDescription, projectConfigJson] ->
         runCommand $
           Command.CreateNewProject.AI.createNewProjectNonInteractiveOnDisk
+            Provider.OpenAI
             projectName
             appDescription
             projectConfigJson

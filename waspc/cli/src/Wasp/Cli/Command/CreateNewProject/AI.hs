@@ -17,7 +17,6 @@ import qualified Data.Text.IO as T.IO
 import StrongPath (Abs, Dir, Path', basename, fromAbsDir, fromRelDir)
 import StrongPath.Operations ()
 import System.Directory (createDirectory, createDirectoryIfMissing, setCurrentDirectory)
-import System.Environment (lookupEnv)
 import System.FilePath (takeDirectory)
 import qualified System.FilePath as FP
 import System.IO (hFlush, stdout)
@@ -30,7 +29,7 @@ import Wasp.AI.GenerateNewProject.Common
   )
 import qualified Wasp.AI.GenerateNewProject.Common as GNP.C
 import qualified Wasp.AI.GenerateNewProject.LogMsg as GNP.L
-import Wasp.AI.OpenAI (OpenAIApiKey)
+import Wasp.AI.Provider (Provider(..), ApiKey, getProviderApiKey)
 import qualified Wasp.AI.OpenAI.ChatGPT as ChatGPT
 import Wasp.Cli.Command (Command, CommandError (CommandError))
 import Wasp.Cli.Command.CreateNewProject.ProjectDescription
@@ -45,9 +44,9 @@ import qualified Wasp.Util as U
 import qualified Wasp.Util.Aeson as Utils.Aeson
 import qualified Wasp.Util.Terminal as T
 
-createNewProjectInteractiveOnDisk :: Path' Abs (Dir WaspProjectDir) -> NewProjectAppName -> Command ()
-createNewProjectInteractiveOnDisk waspProjectDir appName = do
-  openAIApiKey <- getOpenAIApiKey
+createNewProjectInteractiveOnDisk :: Provider -> Path' Abs (Dir WaspProjectDir) -> NewProjectAppName -> Command ()
+createNewProjectInteractiveOnDisk provider waspProjectDir appName = do
+  apiKey <- getProviderApiKey provider
   appDescription <- liftIO $ Interactive.askForRequiredInput "Describe your app in a couple of sentences"
   (planningGptModel, codingGptModel) <-
     liftIO $
@@ -92,7 +91,7 @@ createNewProjectInteractiveOnDisk waspProjectDir appName = do
             GNP.C.projectDefaultGptTemperature = Just temperature
           }
 
-  liftIO $ createNewProjectOnDisk openAIApiKey waspProjectDir appName appDescription projectConfig
+  liftIO $ createNewProjectOnDisk provider apiKey waspProjectDir appName appDescription projectConfig
 
   liftIO $ do
     putStrLn $
@@ -111,8 +110,8 @@ createNewProjectInteractiveOnDisk waspProjectDir appName = do
           "========"
         ]
 
-createNewProjectNonInteractiveOnDisk :: String -> String -> String -> Command ()
-createNewProjectNonInteractiveOnDisk projectName appDescription projectConfigJson = do
+createNewProjectNonInteractiveOnDisk :: Provider -> String -> String -> String -> Command ()
+createNewProjectNonInteractiveOnDisk provider projectName appDescription projectConfigJson = do
   appName <- case parseWaspProjectNameIntoAppName projectName of
     Right appName -> pure appName
     Left err -> throwError $ CommandError "Invalid project name" err
@@ -120,24 +119,25 @@ createNewProjectNonInteractiveOnDisk projectName appDescription projectConfigJso
     Utils.Aeson.decodeFromString projectConfigJson
       & either (throwError . CommandError "Invalid project config" . ("Failed to parse JSON: " <>)) pure
   waspProjectDir <- obtainAvailableProjectDirPath projectName
-  openAIApiKey <- getOpenAIApiKey
-  liftIO $ createNewProjectOnDisk openAIApiKey waspProjectDir appName appDescription projectConfig
+  apiKey <- getProviderApiKey provider
+  liftIO $ createNewProjectOnDisk provider apiKey waspProjectDir appName appDescription projectConfig
 
 createNewProjectOnDisk ::
-  OpenAIApiKey ->
+  Provider ->
+  ApiKey ->
   Path' Abs (Dir WaspProjectDir) ->
   NewProjectAppName ->
   String ->
   NewProjectConfig ->
   IO ()
-createNewProjectOnDisk openAIApiKey waspProjectDir appName appDescription projectConfig = do
+createNewProjectOnDisk provider apiKey waspProjectDir appName appDescription projectConfig = do
   createDirectory $ fromAbsDir waspProjectDir
   setCurrentDirectory $ fromAbsDir waspProjectDir
   generateNewProject codeAgentConfig appName appDescription projectConfig
   where
     codeAgentConfig =
       CA.CodeAgentConfig
-        { CA._openAIApiKey = openAIApiKey,
+        { CA._llmProvider = ChatGPT.OpenAIProvider apiKey,
           CA._writeFile = writeFileToDisk,
           CA._writeLog = forwardLogToStdout
         }
@@ -156,9 +156,9 @@ createNewProjectOnDisk openAIApiKey waspProjectDir appName appDescription projec
 
 -- | Instead of writing files to disk, it will write files (and logs) to the stdout,
 -- with delimiters that make it easy to programmaticaly parse the output.
-createNewProjectNonInteractiveToStdout :: String -> String -> String -> Command ()
-createNewProjectNonInteractiveToStdout projectName appDescription projectConfigJsonStr = do
-  openAIApiKey <- getOpenAIApiKey
+createNewProjectNonInteractiveToStdout :: Provider -> String -> String -> String -> Command ()
+createNewProjectNonInteractiveToStdout provider projectName appDescription projectConfigJsonStr = do
+  apiKey <- getProviderApiKey provider
 
   appName <- case parseWaspProjectNameIntoAppName projectName of
     Right appName -> pure appName
@@ -170,7 +170,7 @@ createNewProjectNonInteractiveToStdout projectName appDescription projectConfigJ
 
   let codeAgentConfig =
         CA.CodeAgentConfig
-          { CA._openAIApiKey = openAIApiKey,
+          { CA._llmProvider = ChatGPT.OpenAIProvider apiKey,
             CA._writeFile = writeFileToStdoutWithDelimiters,
             CA._writeLog = writeLogToStdoutWithDelimiters
           }
@@ -208,29 +208,6 @@ generateNewProject codeAgentConfig (NewProjectAppName appName) appDescription pr
   CA.runCodeAgent codeAgentConfig $ do
     GNP.generateNewProject (newProjectDetails projectConfig appName appDescription) waspProjectSkeletonFiles
 
-getOpenAIApiKey :: Command OpenAIApiKey
-getOpenAIApiKey =
-  liftIO (lookupEnv "OPENAI_API_KEY" <&> (>>= validateKey))
-    >>= maybe throwMissingOpenAIApiKeyEnvVarError pure
-  where
-    validateKey "" = Nothing
-    validateKey k = Just k
-
-    throwMissingOpenAIApiKeyEnvVarError =
-      throwError $
-        CommandError
-          "Missing OPENAI_API_KEY environment variable"
-          $ unlines
-            [ "Wasp AI uses ChatGPT to generate your project, and therefore requires you to provide it with an OpenAI API key.",
-              "You can obtain this key via your OpenAI account's user settings (https://platform.openai.com/account/api-keys).",
-              "Then, set OPENAI_API_KEY env var to it and wasp CLI will read from it.",
-              "",
-              "To persist the OPENAI_API_KEY env var, add",
-              "  export OPENAI_API_KEY=<yourkeyhere>",
-              "to your .bash_profile (or .profile or .zprofile or whatever your machine is using), restart your shell, and you should be good to go.",
-              "",
-              "Alternatively, you can go to our Mage web app at https://usemage.ai and generate new Wasp app there for free, with no OpenAI API keys needed."
-            ]
 
 newProjectDetails :: NewProjectConfig -> String -> String -> NewProjectDetails
 newProjectDetails projectConfig webAppName webAppDescription =

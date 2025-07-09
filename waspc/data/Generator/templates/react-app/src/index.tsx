@@ -3,7 +3,8 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { QueryClientProvider } from '@tanstack/react-query'
 
-import { router } from './router'
+import { Router } from './router'
+import { HelmetProvider } from 'react-helmet-async'
 import {
   initializeQueryClient,
   queryClientInitialized,
@@ -32,16 +33,18 @@ async function render() {
   const queryClient = await queryClientInitialized
   ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
     <React.StrictMode>
-      <QueryClientProvider client={queryClient}>
-        {=# areWebSocketsUsed =}
-        <WebSocketProvider>
-          {router}
-        </WebSocketProvider>
-        {=/ areWebSocketsUsed =}
-        {=^ areWebSocketsUsed =}
-        {router}
-        {=/ areWebSocketsUsed =}
-      </QueryClientProvider>
+      <HelmetProvider>
+        <QueryClientProvider client={queryClient}>
+          {=# areWebSocketsUsed =}
+          <WebSocketProvider>
+            <Router />
+          </WebSocketProvider>
+          {=/ areWebSocketsUsed =}
+          {=^ areWebSocketsUsed =}
+          <Router />
+          {=/ areWebSocketsUsed =}
+        </QueryClientProvider>
+      </HelmetProvider>
     </React.StrictMode>
   )
 }

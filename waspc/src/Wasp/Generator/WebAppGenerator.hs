@@ -40,6 +40,7 @@ import Wasp.Generator.WebAppGenerator.DepVersions
     reactQueryVersion,
     reactRouterVersion,
     reactVersion,
+    reactHelmetAsyncVersion,
   )
 import Wasp.Generator.WebAppGenerator.JsImport (extImportToImportJson)
 import Wasp.Generator.WebAppGenerator.RouterGenerator (genRouter)
@@ -134,7 +135,8 @@ npmDepsForWasp _spec =
             -- React and ReactDOM versions should always match.
             ("react-dom", show reactVersion),
             ("@tanstack/react-query", show reactQueryVersion),
-            ("react-router-dom", show reactRouterVersion)
+            ("react-router-dom", show reactRouterVersion),
+            ("react-helmet-async", show reactHelmetAsyncVersion)
           ],
       N.waspDevDependencies =
         Npm.Dependency.fromList
@@ -215,6 +217,7 @@ genSrcDir spec =
       genFileCopy [relfile|components/Loader.module.css|],
       genFileCopy [relfile|components/FullPageWrapper.tsx|],
       genFileCopy [relfile|components/DefaultRootErrorBoundary.tsx|],
+      genFileCopy [relfile|components/PageHelmet.tsx|],
       getIndexTs spec
     ]
     <++> genAuth spec

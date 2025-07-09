@@ -707,6 +707,7 @@ test-suite waspc-test
     Generator.NpmDependenciesTest
     JsImportTest
     StudioDataTest
+    Cli.StudioTest
 
 test-suite waspls-test
   import: common-all, common-exe

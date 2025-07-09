@@ -116,6 +116,10 @@ export function getAppConfig(
         config: {
           title: "Mock App",
           wasp: { version: "^0.16.3" },
+          metaDescription: "Description",
+          ogTitle: "OG Title",
+          ogDescription: "OG Description",
+          canonicalUrl: "https://example.com",
           head: ['<link rel="icon" href="/favicon.ico" />'],
         },
       } satisfies FullNamedConfig<TsAppSpec.AppConfig>;

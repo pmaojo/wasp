@@ -85,6 +85,10 @@ describe("mapApp", () => {
         version: tsAppSpec.app.config.wasp.version,
       },
       title: tsAppSpec.app.config.title,
+      metaDescription: tsAppSpec.app.config.metaDescription,
+      ogTitle: tsAppSpec.app.config.ogTitle,
+      ogDescription: tsAppSpec.app.config.ogDescription,
+      canonicalUrl: tsAppSpec.app.config.canonicalUrl,
       head: tsAppSpec.app.config.head,
       auth:
         tsAppSpec.auth &&

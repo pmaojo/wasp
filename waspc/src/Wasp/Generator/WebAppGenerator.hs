@@ -193,6 +193,10 @@ genIndexHtml spec =
     templateData =
       object
         [ "title" .= (AS.App.title (snd $ getApp spec) :: String),
+          "metaDescription" .= (AS.App.metaDescription (snd $ getApp spec) :: Maybe String),
+          "ogTitle" .= (AS.App.ogTitle (snd $ getApp spec) :: Maybe String),
+          "ogDescription" .= (AS.App.ogDescription (snd $ getApp spec) :: Maybe String),
+          "canonicalUrl" .= (AS.App.canonicalUrl (snd $ getApp spec) :: Maybe String),
           "head" .= (maybe "" (intercalate "\n") (AS.App.head $ snd $ getApp spec) :: String)
         ]
 

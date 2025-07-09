@@ -93,6 +93,10 @@ export type Crud = {
 export type App = {
   wasp: Wasp;
   title: string;
+  metaDescription: Optional<string>;
+  ogTitle: Optional<string>;
+  ogDescription: Optional<string>;
+  canonicalUrl: Optional<string>;
   head: Optional<string[]>;
   auth: Optional<Auth>;
   server: Optional<Server>;

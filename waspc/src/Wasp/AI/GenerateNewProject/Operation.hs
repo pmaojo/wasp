@@ -28,7 +28,7 @@ import Wasp.AI.GenerateNewProject.Common
     NewProjectDetails (..),
     codingChatGPTParams,
     fixingChatGPTParams,
-    queryChatGPTForJSON,
+    queryLLMForJSON,
     writeToWaspFileEnd,
   )
 import Wasp.AI.GenerateNewProject.Common.Prompts (appDescriptionStartMarkerLine)
@@ -36,7 +36,7 @@ import qualified Wasp.AI.GenerateNewProject.Common.Prompts as Prompts
 import Wasp.AI.GenerateNewProject.Entity (entityPlanToPrismaModelText)
 import Wasp.AI.GenerateNewProject.Plan (Plan)
 import qualified Wasp.AI.GenerateNewProject.Plan as Plan
-import Wasp.AI.OpenAI.ChatGPT (ChatMessage (..), ChatRole (..))
+import Wasp.AI.LLM (ChatMessage (..), ChatRole (..))
 import qualified Wasp.Analyzer.Parser as P
 import qualified Wasp.Util.Aeson as Util.Aeson
 
@@ -51,7 +51,7 @@ generateAndWriteOperation operationType newProjectDetails waspFilePath plan oper
 generateOperation :: OperationType -> NewProjectDetails -> [Plan.Entity] -> Plan.Operation -> CodeAgent Operation
 generateOperation operationType newProjectDetails entityPlans operationPlan = do
   impl <-
-    queryChatGPTForJSON (codingChatGPTParams newProjectDetails) chatMessages
+    queryLLMForJSON (codingChatGPTParams newProjectDetails) chatMessages
       >>= fixOperationImplIfNeeded
   return Operation {opImpl = impl, opPlan = operationPlan, opType = operationType}
   where
@@ -129,7 +129,7 @@ generateOperation operationType newProjectDetails entityPlans operationPlan = do
         then return operationImpl
         else do
           let issuesText = T.pack $ intercalate "\n" ((" - " <>) <$> issues)
-          queryChatGPTForJSON (fixingChatGPTParams $ codingChatGPTParams newProjectDetails) $
+          queryLLMForJSON (fixingChatGPTParams $ codingChatGPTParams newProjectDetails) $
             chatMessages
               <> [ ChatMessage {role = Assistant, content = Util.Aeson.encodeToText operationImpl},
                    ChatMessage

@@ -22,14 +22,14 @@ import Wasp.AI.GenerateNewProject.Common
   ( CodeAgent,
     NewProjectDetails (..),
     codingChatGPTParams,
-    queryChatGPTForJSON,
+    queryLLMForJSON,
     writeToWaspFileEnd,
   )
 import qualified Wasp.AI.GenerateNewProject.Common.Prompts as Prompts
 import Wasp.AI.GenerateNewProject.Entity (entityPlanToPrismaModelText)
 import Wasp.AI.GenerateNewProject.Operation (Operation (opImpl, opPlan), OperationImpl (opJsImpl))
 import qualified Wasp.AI.GenerateNewProject.Plan as Plan
-import Wasp.AI.OpenAI.ChatGPT (ChatMessage (..), ChatRole (..))
+import Wasp.AI.LLM (ChatMessage (..), ChatRole (..))
 
 generateAndWritePage ::
   NewProjectDetails -> FilePath -> [Plan.Entity] -> [Operation] -> [Operation] -> Plan.Page -> CodeAgent Page
@@ -42,7 +42,7 @@ generateAndWritePage newProjectDetails waspFilePath entityPlans queries actions 
 
 generatePage :: NewProjectDetails -> [Plan.Entity] -> [Operation] -> [Operation] -> Plan.Page -> CodeAgent Page
 generatePage newProjectDetails entityPlans queries actions pPlan = do
-  impl <- queryChatGPTForJSON (codingChatGPTParams newProjectDetails) chatMessages
+  impl <- queryLLMForJSON (codingChatGPTParams newProjectDetails) chatMessages
   return Page {pageImpl = impl, pagePlan = pPlan}
   where
     chatMessages =

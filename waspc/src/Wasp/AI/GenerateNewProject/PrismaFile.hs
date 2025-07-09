@@ -17,12 +17,12 @@ import Wasp.AI.GenerateNewProject.Common
     NewProjectDetails,
     codingChatGPTParams,
     fixingChatGPTParams,
-    queryChatGPTForJSON,
+    queryLLMForJSON,
   )
 import Wasp.AI.GenerateNewProject.Common.Prompts (appDescriptionBlock)
 import qualified Wasp.AI.GenerateNewProject.Common.Prompts as Prompts
 import Wasp.AI.GenerateNewProject.Plan (Plan)
-import Wasp.AI.OpenAI.ChatGPT (ChatMessage (..), ChatRole (..))
+import Wasp.AI.LLM (ChatMessage (..), ChatRole (..))
 import Wasp.Psl.Format (PrismaFormatResult (..))
 import qualified Wasp.Psl.Format as Prisma
 import qualified Wasp.Util.Aeson as Utils.Aeson
@@ -42,7 +42,7 @@ fixPrismaFile newProjectDetails prismaFilePath plan = do
       case prismaFormatResult of
         PrismaFormatResult {_schemaErrors = Nothing} -> return $ FileContent {fileContent = prismaFileContent}
         PrismaFormatResult {_schemaErrors = Just schemaErrors} ->
-          queryChatGPTForJSON
+          queryLLMForJSON
             (fixingChatGPTParams $ codingChatGPTParams newProjectDetails)
             [ ChatMessage {role = System, content = Prompts.systemPrompt},
               ChatMessage {role = User, content = fixPrismaFilePrompt prismaFileContent schemaErrors}

@@ -18,12 +18,12 @@ import Wasp.AI.GenerateNewProject.Common
     NewProjectDetails,
     codingChatGPTParams,
     fixingChatGPTParams,
-    queryChatGPTForJSON,
+    queryLLMForJSON,
   )
 import Wasp.AI.GenerateNewProject.Common.Prompts (appDescriptionBlock)
 import qualified Wasp.AI.GenerateNewProject.Common.Prompts as Prompts
 import Wasp.AI.GenerateNewProject.Operation (actionDocPrompt, queryDocPrompt)
-import Wasp.AI.OpenAI.ChatGPT (ChatMessage (..), ChatRole (..))
+import Wasp.AI.LLM (ChatMessage (..), ChatRole (..))
 
 fixOperationsJsFile :: NewProjectDetails -> FilePath -> FilePath -> CodeAgent ()
 fixOperationsJsFile newProjectDetails waspFilePath opJsFilePath = do
@@ -33,7 +33,7 @@ fixOperationsJsFile newProjectDetails waspFilePath opJsFilePath = do
   --   For that however, we would likely need the whole Wasp file generated on the disk,
   --   with npm dependencies installed, so we skipped it for now.
   fixedOpJsFile <-
-    queryChatGPTForJSON
+    queryLLMForJSON
       (fixingChatGPTParams $ codingChatGPTParams newProjectDetails)
       [ ChatMessage {role = System, content = Prompts.systemPrompt},
         ChatMessage {role = User, content = fixOpJsFilePrompt currentWaspFileContent currentOpJsFileContent}

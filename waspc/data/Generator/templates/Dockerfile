@@ -43,7 +43,7 @@ COPY db/schema.prisma .wasp/build/db/
 RUN cd .wasp/build/server && npx prisma generate --schema='{= dbSchemaFileFromServerDir =}'
 {=/ usingPrisma =}
 # Building the server should come after Prisma generation.
-RUN cd .wasp/build/server && npm run bundle
+RUN cd .wasp/build/server && npm run build
 
 
 # TODO: Use pm2?

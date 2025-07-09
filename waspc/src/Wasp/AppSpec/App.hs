@@ -19,6 +19,10 @@ import Wasp.AppSpec.Core.IsDecl (IsDecl)
 data App = App
   { wasp :: Wasp,
     title :: String,
+    metaDescription :: Maybe String,
+    ogTitle :: Maybe String,
+    ogDescription :: Maybe String,
+    canonicalUrl :: Maybe String,
     head :: Maybe [String],
     auth :: Maybe Auth,
     server :: Maybe Server,

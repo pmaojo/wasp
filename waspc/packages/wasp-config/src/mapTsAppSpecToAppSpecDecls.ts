@@ -193,10 +193,22 @@ export function mapApp(
   emailSender?: TsAppSpec.EmailSenderConfig,
   webSocket?: TsAppSpec.WebsocketConfig,
 ): AppSpec.App {
-  const { title, wasp, head } = app;
+  const {
+    title,
+    wasp,
+    head,
+    metaDescription,
+    ogTitle,
+    ogDescription,
+    canonicalUrl,
+  } = app;
   return {
     wasp,
     title,
+    metaDescription,
+    ogTitle,
+    ogDescription,
+    canonicalUrl,
     head,
     auth: auth && mapAuth(auth, entityRefParser, routeRefParser),
     client: client && mapClient(client),

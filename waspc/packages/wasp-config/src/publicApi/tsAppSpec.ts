@@ -22,6 +22,10 @@ export type TsAppSpec = {
 export type AppConfig = {
   title: string;
   wasp: AppSpec.Wasp;
+  metaDescription?: string;
+  ogTitle?: string;
+  ogDescription?: string;
+  canonicalUrl?: string;
   head?: string[];
 };
 

@@ -334,6 +334,7 @@ spec_AppSpecValid = do
         let makeSpec emailSender isBuild =
               basicAppSpec
                 { AS.isBuild = isBuild,
+                  AS.isSSR = False,
                   AS.decls =
                     [ AS.Decl.makeDecl "TestApp" $
                         basicApp
@@ -504,6 +505,7 @@ spec_AppSpecValid = do
                 Npm.PackageJson.devDependencies = M.empty
               },
           AS.isBuild = False,
+          AS.isSSR = False,
           AS.migrationsDir = Nothing,
           AS.devEnvVarsClient = [],
           AS.devEnvVarsServer = [],

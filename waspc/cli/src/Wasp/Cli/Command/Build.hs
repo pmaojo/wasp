@@ -47,8 +47,8 @@ import Wasp.Util.Json (updateJsonFile)
 -- success/failure message, further steps, ...).
 -- Finally, throws if there was a compile/build error.
 -- Very similar to 'compile'.
-build :: Command ()
-build = do
+build :: Bool -> Command ()
+build useSsr = do
   InWaspProject waspProjectDir <- require
 
   let buildDir =
@@ -72,7 +72,7 @@ build = do
 
   cliSendMessageC $ Msg.Start "Building wasp project..."
 
-  (warnings, errors) <- liftIO $ buildIO waspProjectDir buildDir
+  (warnings, errors) <- liftIO $ buildIO waspProjectDir buildDir useSsr
   liftIO $ printCompilationResult (warnings, errors)
   unless (null errors) $
     throwError $
@@ -162,13 +162,15 @@ build = do
 buildIO ::
   Path' Abs (Dir WaspProjectDir) ->
   Path' Abs (Dir ProjectRootDir) ->
+  Bool ->
   IO ([CompileWarning], [CompileError])
-buildIO waspProjectDir buildDir = compileIOWithOptions options waspProjectDir buildDir
+buildIO waspProjectDir buildDir useSsr = compileIOWithOptions options waspProjectDir buildDir
   where
     options =
       CompileOptions
         { waspProjectDirPath = waspProjectDir,
           isBuild = True,
+          useSsr = useSsr,
           sendMessage = cliSendMessage,
           -- Ignore "DB needs migration warnings" during build, as that is not a required step.
           generatorWarningsFilter =

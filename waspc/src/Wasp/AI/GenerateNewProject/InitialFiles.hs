@@ -8,7 +8,7 @@ import Control.Arrow (first)
 import Data.Text (Text)
 import qualified Data.Text as T
 import NeatInterpolation (trimming)
-import StrongPath (File', Path, Rel)
+import StrongPath (File', Path, Rel, Path', relfile)
 import qualified StrongPath as SP
 import StrongPath.Types (System)
 import Wasp.AI.CodeAgent (writeNewFile)
@@ -26,8 +26,8 @@ import qualified Wasp.SemanticVersion as SV
 import qualified Wasp.Version
 
 data InitialFilesGenResult = InitialFilesGenResult
-  { _waspFilePath :: FilePath,
-    _prismaFilePath :: FilePath,
+  { _waspFilePath :: Path' (Rel WaspProjectDir) File',
+    _prismaFilePath :: Path' (Rel WaspProjectDir) File',
     _planRules :: [PlanRule]
   }
 
@@ -66,7 +66,7 @@ genAndWriteInitialFiles newProjectDetails waspProjectSkeletonFiles = do
 generateBaseWaspFile :: NewProjectDetails -> (File, [PlanRule])
 generateBaseWaspFile newProjectDetails = ((path, content), planRules)
   where
-    path = "main.wasp"
+    path = [relfile|main.wasp|]
     appName = T.pack $ _projectAppName newProjectDetails
     appTitle = appName
     waspVersionRange = T.pack . show $ SV.backwardsCompatibleWith Wasp.Version.waspVersion
@@ -113,7 +113,7 @@ generateBaseWaspFile newProjectDetails = ((path, content), planRules)
       |]
 
 generateBasePrismaFile :: NewProjectDetails -> (File, [PlanRule])
-generateBasePrismaFile newProjectDetails = (("schema.prisma", content), planRules)
+generateBasePrismaFile newProjectDetails = (([relfile|schema.prisma|], content), planRules)
   where
     content =
       [trimming|
@@ -143,7 +143,7 @@ generateBasePrismaFile newProjectDetails = (("schema.prisma", content), planRule
 --   have to keep stuff in sync here.
 generatePackageJson :: NewProjectDetails -> File
 generatePackageJson newProjectDetails =
-  ( "package.json",
+  ( [relfile|package.json|],
     [trimming|
       {
         "name": "${appName}",
@@ -170,7 +170,7 @@ generatePackageJson newProjectDetails =
 
 generateLoginJsPage :: File
 generateLoginJsPage =
-  ( "src/pages/auth/Login.jsx",
+  ( [relfile|src/pages/auth/Login.jsx|],
     [trimming|
       import React from "react";
       import { Link } from "wasp/client/router";
@@ -209,7 +209,7 @@ generateLoginJsPage =
 
 generateSignupJsPage :: File
 generateSignupJsPage =
-  ( "src/pages/auth/Signup.jsx",
+  ( [relfile|src/pages/auth/Signup.jsx|],
     [trimming|
       import React from "react";
       import { Link } from "wasp/client/router";
@@ -248,7 +248,7 @@ generateSignupJsPage =
 
 generateDotEnvServerFile :: File
 generateDotEnvServerFile =
-  ( ".env.server",
+  ( [relfile|.env.server|],
     [trimming|
       # Here you can define env vars to pass to the server.
       # MY_ENV_VAR=foobar
@@ -257,7 +257,7 @@ generateDotEnvServerFile =
 
 generateMainCssFile :: File
 generateMainCssFile =
-  ( "src/Main.css",
+  ( [relfile|src/Main.css|],
     [trimming|
       @tailwind base;
       @tailwind components;
@@ -273,7 +273,7 @@ generateMainCssFile =
 
 generateLayoutComponent :: NewProjectDetails -> File
 generateLayoutComponent newProjectDetails =
-  ( "src/Layout.jsx",
+  ( [relfile|src/Layout.jsx|],
     [trimming|
       import { Link } from "wasp/client/router";
       import { useAuth, logout } from "wasp/client/auth";
@@ -324,7 +324,7 @@ generateLayoutComponent newProjectDetails =
 
 generateTailwindConfigFile :: NewProjectDetails -> File
 generateTailwindConfigFile newProjectDetails =
-  ( "tailwind.config.cjs",
+  ( [relfile|tailwind.config.cjs|],
     [trimming|
       const { resolveProjectPath } = require('wasp/dev')
       const colors = require('tailwindcss/colors')
@@ -361,7 +361,7 @@ generateTailwindConfigFile newProjectDetails =
 
 generatePostcssConfigFile :: File
 generatePostcssConfigFile =
-  ( "postcss.config.cjs",
+  ( [relfile|postcss.config.cjs|],
     [trimming|
       module.exports = {
         plugins: {

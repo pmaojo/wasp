@@ -38,6 +38,9 @@ import Wasp.Util.IO.Retry (MonadRetry)
 import qualified Wasp.Util.IO.Retry as R
 import Wasp.Util.Network.HTTP (catchRetryableHttpException)
 import qualified Wasp.Util.Network.HTTP as Utils.HTTP
+import StrongPath (Path', Rel, File')
+import qualified StrongPath as SP
+import Wasp.Project.Common (WaspProjectDir)
 
 newtype GenericCodeAgent provider logMsg a =
   GenericCodeAgent {_unCodeAgent :: ReaderT (CodeAgentConfig provider logMsg) (StateT CodeAgentState IO) a}
@@ -47,7 +50,7 @@ type CodeAgent = GenericCodeAgent OpenAIProvider
 
 data CodeAgentConfig provider logMsg = CodeAgentConfig
   { _llmProvider :: !provider,
-    _writeFile :: !(FilePath -> Text -> IO ()),
+    _writeFile :: !(Path' (Rel WaspProjectDir) File' -> Text -> IO ()),
     _writeLog :: !(logMsg -> IO ())
   }
 
@@ -90,20 +93,20 @@ runCodeAgent config codeAgent =
 writeToLog :: IsString logMsg => logMsg -> GenericCodeAgent provider logMsg ()
 writeToLog msg = asks _writeLog >>= \f -> liftIO $ f msg
 
-writeToFile :: FilePath -> (Maybe Text -> Text) -> GenericCodeAgent provider logMsg ()
+writeToFile :: Path' (Rel WaspProjectDir) File' -> (Maybe Text -> Text) -> GenericCodeAgent provider logMsg ()
 writeToFile path updateContentFn = do
   content <- updateContentFn <$> getFile path
   asks _writeFile >>= \f -> liftIO $ f path content
   modify $ \s -> s {_files = H.insert path content (_files s)}
 
-writeNewFile :: (FilePath, Text) -> GenericCodeAgent provider logMsg ()
+writeNewFile :: (Path' (Rel WaspProjectDir) File', Text) -> GenericCodeAgent provider logMsg ()
 writeNewFile (path, content) =
-  writeToFile path (maybe content $ error $ "file " <> path <> " shouldn't already exist")
+  writeToFile path (maybe content $ error $ "file " <> SP.toFilePath path <> " shouldn't already exist")
 
-getFile :: FilePath -> GenericCodeAgent provider logMsg (Maybe Text)
+getFile :: Path' (Rel WaspProjectDir) File' -> GenericCodeAgent provider logMsg (Maybe Text)
 getFile path = gets $ H.lookup path . _files
 
-getAllFiles :: GenericCodeAgent provider logMsg [(FilePath, Text)]
+getAllFiles :: GenericCodeAgent provider logMsg [(Path' (Rel WaspProjectDir) File', Text)]
 getAllFiles = gets $ H.toList . _files
 
 queryLLM :: (LLMProvider provider) => Params provider -> [ChatMessage] -> GenericCodeAgent provider logMsg Text
@@ -143,6 +146,6 @@ getTotalTokensUsage = do
   return (numPromptTokens, numCompletionTokens)
 
 data CodeAgentState = CodeAgentState
-  { _files :: !(H.HashMap FilePath Text), -- TODO: Name this "cacheFiles" maybe?
+  { _files :: !(H.HashMap (Path' (Rel WaspProjectDir) File') Text), -- TODO: Name this "cacheFiles" maybe?
     _usage :: ![ChatResponseUsage]
   }

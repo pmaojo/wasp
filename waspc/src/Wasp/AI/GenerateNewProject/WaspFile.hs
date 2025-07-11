@@ -27,8 +27,11 @@ import Wasp.Analyzer.Parser.Ctx (Ctx (..))
 import Wasp.Project.WaspFile.WaspLang (analyzeWaspFileContent)
 import qualified Wasp.Psl.Ast.Schema as Psl.Schema
 import qualified Wasp.Util.Aeson as Utils.Aeson
+import StrongPath (Path', Rel, File')
+import qualified StrongPath as SP
+import Wasp.Project.Common (WaspProjectDir)
 
-fixWaspFile :: NewProjectDetails -> FilePath -> Plan -> CodeAgent ()
+fixWaspFile :: NewProjectDetails -> Path' (Rel WaspProjectDir) File' -> Plan -> CodeAgent ()
 fixWaspFile newProjectDetails waspFilePath plan = do
   currentWaspFileContent <- getFile waspFilePath <&> fromMaybe (error "couldn't find wasp file to fix")
 

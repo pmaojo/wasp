@@ -23,6 +23,7 @@ cabal-version:       >=1.10
 executable App
   main-is:             Main.hs
   -- other-modules:
+        RootApplication
   -- other-extensions:
   build-depends:
   	ihp,
@@ -69,3 +70,19 @@ executable App
     , PartialTypeSignatures
     , StandaloneDeriving
     , DerivingVia
+
+test-suite gui-test
+  type: exitcode-stdio-1.0
+  hs-source-dirs: Test
+  main-is: Main.hs
+  build-tool-depends:
+    tasty-discover:tasty-discover
+  build-depends:
+    , base
+    , ihp
+    , wai
+    , text
+    , hspec
+  other-modules:
+    RootApplication
+  default-language: Haskell2010

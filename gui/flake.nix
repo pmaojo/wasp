@@ -22,15 +22,13 @@
                         # Native dependencies, e.g. imagemagick
                     ];
                     haskellPackages = p: with p; [
-                        # Haskell dependencies go here
+                        -- Haskell dependencies go here
                         p.ihp
                         cabal-install
                         base
                         wai
                         text
-
-                        # Uncomment on local development for testing
-                        # hspec
+                        hspec
                     ];
                 };
 

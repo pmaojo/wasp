@@ -2,6 +2,7 @@ module Main where
 import IHP.Prelude
 
 import Config
+import RootApplication
 import qualified IHP.Server
 import IHP.RouterSupport
 import IHP.FrameworkConfig

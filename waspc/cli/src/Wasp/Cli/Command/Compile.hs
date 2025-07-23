@@ -117,6 +117,7 @@ defaultCompileOptions waspProjectDir =
   CompileOptions
     { waspProjectDirPath = waspProjectDir,
       isBuild = False,
+      useSsr = False,
       sendMessage = cliSendMessage,
       generatorWarningsFilter = id
     }

@@ -82,6 +82,8 @@ data AppSpec = AppSpec
     -- | If true, it means project is being compiled for production/deployment -> it is being "built".
     -- If false, it means project is being compiled for development purposes (e.g. "wasp start").
     isBuild :: Bool,
+    -- | If true, generated project will include server-side rendering setup.
+    isSSR :: Bool,
     -- | The contents of the optional user Dockerfile found in the root of the wasp project source.
     userDockerfileContents :: Maybe Text,
     -- | A list of paths to Tailwind specific config files and where to copy them.

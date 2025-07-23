@@ -206,8 +206,12 @@ genIndexHtml spec =
           "ogTitle" .= (AS.App.ogTitle (snd $ getApp spec) :: Maybe String),
           "ogDescription" .= (AS.App.ogDescription (snd $ getApp spec) :: Maybe String),
           "canonicalUrl" .= (AS.App.canonicalUrl (snd $ getApp spec) :: Maybe String),
-          "head" .= (maybe "" (intercalate "\n") (AS.App.head $ snd $ getApp spec) :: String)
+          "head" .= (maybe "" (intercalate "\n") (AS.App.head $ snd $ getApp spec) :: String),
+          "entryPoint" .= entryPoint,
+          "isSSR" .= AS.isSSR spec
         ]
+    entryPoint :: String
+    entryPoint = if AS.isSSR spec then "/src/entry-client.tsx" else "/src/index.tsx"
 
 -- TODO(matija): Currently we also generate auth-specific parts in this file (e.g. token management),
 -- although they are not used anywhere outside.
@@ -224,13 +228,18 @@ genSrcDir spec =
       genFileCopy [relfile|components/Loader.module.css|],
       genFileCopy [relfile|components/FullPageWrapper.tsx|],
       genFileCopy [relfile|components/DefaultRootErrorBoundary.tsx|],
-      genFileCopy [relfile|components/PageHelmet.tsx|],
+    genFileCopy [relfile|components/PageHelmet.tsx|],
       getIndexTs spec
     ]
     <++> genAuth spec
     <++> genRouter spec
+    <++> genSsrFiles spec
   where
     genFileCopy = return . C.mkSrcTmplFd
+
+    genSsrFiles s
+      | AS.isSSR s = sequence [genFileCopy [relfile|entry-client.tsx|], genFileCopy [relfile|entry-server.tsx|]]
+      | otherwise = return []
 
 getIndexTs :: AppSpec -> Generator FileDraft
 getIndexTs spec =

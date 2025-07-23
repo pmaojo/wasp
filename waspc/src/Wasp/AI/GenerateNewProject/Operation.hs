@@ -16,7 +16,7 @@ where
 
 import Data.Aeson (FromJSON)
 import Data.Aeson.Types (ToJSON)
-import Data.List (find, intercalate, isInfixOf, isPrefixOf, nub)
+import Data.List (find, intercalate, isInfixOf, isPrefixOf, stripPrefix, nub)
 import Data.String (fromString)
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -38,9 +38,12 @@ import Wasp.AI.GenerateNewProject.Plan (Plan)
 import qualified Wasp.AI.GenerateNewProject.Plan as Plan
 import Wasp.AI.LLM (ChatMessage (..), ChatRole (..))
 import qualified Wasp.Analyzer.Parser as P
+import StrongPath (Path', Rel, File', parseRelFile)
+import qualified StrongPath as SP
+import Wasp.Project.Common (WaspProjectDir)
 import qualified Wasp.Util.Aeson as Util.Aeson
 
-generateAndWriteOperation :: OperationType -> NewProjectDetails -> FilePath -> Plan -> Plan.Operation -> CodeAgent Operation
+generateAndWriteOperation :: OperationType -> NewProjectDetails -> Path' (Rel WaspProjectDir) File' -> Plan -> Plan.Operation -> CodeAgent Operation
 generateAndWriteOperation operationType newProjectDetails waspFilePath plan operationPlan = do
   operation <- generateOperation operationType newProjectDetails (Plan.entities plan) operationPlan
   writeOperationToJsFile operation
@@ -351,13 +354,15 @@ writeOperationToJsFile operation =
     operationJsImpl = T.pack $ opJsImpl $ opImpl operation
     operationJsImportsBlock = T.pack $ maybe "" (<> "\n") $ opJsImports $ opImpl operation
 
-getOperationJsFilePath :: Operation -> FilePath
-getOperationJsFilePath operation = resolvePath $ Plan.opFnPath $ opPlan operation
-  where
-    resolvePath p | "@src/" `isPrefixOf` p = drop (length ("@" :: String)) p
-    resolvePath _ = error "path incorrectly formatted, should start with @src/ ."
+getOperationJsFilePath :: Operation -> Path' (Rel WaspProjectDir) File'
+getOperationJsFilePath operation =
+  case stripPrefix "@src/" (Plan.opFnPath $ opPlan operation) of
+    Just p -> case SP.parseRelFile p of
+      Just fp -> fp
+      Nothing -> error "failed to parse operation path"
+    Nothing -> error "path incorrectly formatted, should start with @src/"
 
-writeOperationToWaspFile :: FilePath -> Operation -> CodeAgent ()
+writeOperationToWaspFile :: Path' (Rel WaspProjectDir) File' -> Operation -> CodeAgent ()
 writeOperationToWaspFile waspFilePath operation =
   writeToWaspFileEnd waspFilePath $ "\n" <> waspDeclCode
   where

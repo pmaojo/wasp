@@ -91,6 +91,11 @@ jobs:
           # Execute the tests.
           runghc $(make print-ghc-extensions) -i. -ibuild -iConfig Test/Main.hs
 
+          # Run frontend tests.
+          cd ../../frontend
+          npm ci
+          npm test -- --runInBand
+
     # Push to cachix after successful tests
     # - name: Push to Cachix
     #   if: github.ref == 'refs/heads/main'

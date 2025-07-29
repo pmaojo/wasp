@@ -7,9 +7,17 @@ import qualified IHP.Server
 import IHP.RouterSupport
 import IHP.FrameworkConfig
 import IHP.Job.Types
+import Application.Controller.UsersController
+import Application.Controller.PostsController
 
 instance FrontController RootApplication where
-    controllers = []
+    controllers =
+        [ startPage UsersAction
+        , parseRoute @"/Posts" PostsAction
+        , parseRoute @"/Users" UsersAction
+        , parseRoute @"/Users.json" UsersJsonAction
+        , parseRoute @"/Posts.json" PostsJsonAction
+        ]
 
 instance Worker RootApplication where
     workers _ = []

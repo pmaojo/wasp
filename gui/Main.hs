@@ -9,15 +9,20 @@ import IHP.FrameworkConfig
 import IHP.Job.Types
 import Application.Controller.UsersController
 import Application.Controller.PostsController
+import Application.Controller.CliRunsController
+import Application.Controller.CliController
 
 instance FrontController RootApplication where
     controllers =
-        [ startPage UsersAction
-        , parseRoute @"/Posts" PostsAction
-        , parseRoute @"/Users" UsersAction
-        , parseRoute @"/Users.json" UsersJsonAction
-        , parseRoute @"/Posts.json" PostsJsonAction
-        ]
+          [ startPage UsersAction
+          , parseRoute @"/Posts" PostsAction
+          , parseRoute @"/Users" UsersAction
+          , parseRoute @"/CliRuns" CliRunsAction
+          , parseRoute @"/Cli" CliAction
+          , parseRoute @"/Users.json" UsersJsonAction
+          , parseRoute @"/Posts.json" PostsJsonAction
+          , parseRoute @"/CliRuns.json" CliRunsJsonAction
+          ]
 
 instance Worker RootApplication where
     workers _ = []

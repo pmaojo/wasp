@@ -10,6 +10,7 @@ import IHP.Job.Types
 import Application.Controller.UsersController
 import Application.Controller.PostsController
 import Application.Controller.CliRunsController
+import Application.Controller.CliController
 
 instance FrontController RootApplication where
     controllers =
@@ -17,6 +18,7 @@ instance FrontController RootApplication where
           , parseRoute @"/Posts" PostsAction
           , parseRoute @"/Users" UsersAction
           , parseRoute @"/CliRuns" CliRunsAction
+          , parseRoute @"/Cli" CliAction
           , parseRoute @"/Users.json" UsersJsonAction
           , parseRoute @"/Posts.json" PostsJsonAction
           , parseRoute @"/CliRuns.json" CliRunsJsonAction

@@ -1,15 +1,33 @@
-import { useState } from "react";
-import useCli from "../hooks/useCli";
+import { FormEvent, useState } from "react";
+import useRunCli from "../hooks/useRunCli";
 
 export default function CliRunner() {
-  const { jobId, run } = useCli();
-  const [cmd, setCmd] = useState("");
+  const { run, lastRun } = useRunCli();
+  const [command, setCommand] = useState("echo");
+  const [args, setArgs] = useState("hello");
+
+  const onSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    const argArray = args.trim() ? args.split(" ") : [];
+    await run(command, argArray);
+  };
 
   return (
     <div>
-      <input value={cmd} onChange={(e) => setCmd(e.target.value)} />
-      <button onClick={() => run(cmd)}>Run</button>
-      {jobId && <p>Job started: {jobId}</p>}
+      <form onSubmit={onSubmit}>
+        <input
+          value={command}
+          onChange={(e) => setCommand(e.target.value)}
+          placeholder="Command"
+        />
+        <input
+          value={args}
+          onChange={(e) => setArgs(e.target.value)}
+          placeholder="Args"
+        />
+        <button type="submit">Run</button>
+      </form>
+      {lastRun && <pre>{lastRun.stdout || lastRun.stderr}</pre>}
     </div>
   );
 }

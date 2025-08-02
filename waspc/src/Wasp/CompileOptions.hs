@@ -14,6 +14,7 @@ import Wasp.Project.Common (WaspProjectDir)
 data CompileOptions = CompileOptions
   { waspProjectDirPath :: !(Path' Abs (Dir WaspProjectDir)),
     isBuild :: !Bool,
+    useSsr :: !Bool,
     -- We give the compiler the ability to send messages. The code that
     -- invokes the compiler (such as the CLI) can then implement a way
     -- to display these messages.

@@ -14,7 +14,8 @@ import Data.List (intercalate)
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Text as T
 import qualified Data.Text.IO as T.IO
-import StrongPath (Abs, Dir, Path', basename, fromAbsDir, fromRelDir)
+import StrongPath (Abs, Dir, Path', Rel, File', basename, fromAbsDir, fromRelDir)
+import qualified StrongPath as SP
 import StrongPath.Operations ()
 import System.Directory (createDirectory, createDirectoryIfMissing, setCurrentDirectory)
 import System.FilePath (takeDirectory)
@@ -142,11 +143,12 @@ createNewProjectOnDisk provider apiKey waspProjectDir appName appDescription pro
           CA._writeLog = forwardLogToStdout
         }
 
-    writeFileToDisk :: FilePath -> T.Text -> IO ()
+    writeFileToDisk :: SP.Path' (SP.Rel WaspProjectDir) SP.File' -> T.Text -> IO ()
     writeFileToDisk path content = do
-      createDirectoryIfMissing True (takeDirectory path)
-      T.IO.writeFile path content
-      putStrLn $ T.applyStyles [T.Yellow] $ "> Wrote to file: " <> fromRelDir (basename waspProjectDir) FP.</> path
+      let fp = SP.toFilePath path
+      createDirectoryIfMissing True (takeDirectory fp)
+      T.IO.writeFile fp content
+      putStrLn $ T.applyStyles [T.Yellow] $ "> Wrote to file: " <> fromRelDir (basename waspProjectDir) FP.</> fp
       hFlush stdout
 
     forwardLogToStdout :: GNP.L.LogMsg -> IO ()
@@ -177,9 +179,9 @@ createNewProjectNonInteractiveToStdout provider projectName appDescription proje
 
   liftIO $ generateNewProject codeAgentConfig appName appDescription projectConfig
   where
-    writeFileToStdoutWithDelimiters :: FilePath -> T.Text -> IO ()
+    writeFileToStdoutWithDelimiters :: SP.Path' (SP.Rel WaspProjectDir) SP.File' -> T.Text -> IO ()
     writeFileToStdoutWithDelimiters path content =
-      writeToStdoutWithDelimiters "WRITE FILE" [path, T.unpack content]
+      writeToStdoutWithDelimiters "WRITE FILE" [SP.toFilePath path, T.unpack content]
 
     writeLogToStdoutWithDelimiters :: GNP.L.LogMsg -> IO ()
     writeLogToStdoutWithDelimiters msg =

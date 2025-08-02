@@ -8,9 +8,12 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import NeatInterpolation (trimming)
 import Wasp.AI.GenerateNewProject.Common (CodeAgent, writeToWaspFileEnd)
+import StrongPath (Path', Rel, File')
+import qualified StrongPath as SP
+import Wasp.Project.Common (WaspProjectDir)
 import qualified Wasp.AI.GenerateNewProject.Plan as Plan
 
-writeEntitiesToPrismaFile :: FilePath -> [Plan.Entity] -> CodeAgent ()
+writeEntitiesToPrismaFile :: Path' (Rel WaspProjectDir) File' -> [Plan.Entity] -> CodeAgent ()
 writeEntitiesToPrismaFile prismaFilePath entityPlans = do
   writeToWaspFileEnd prismaFilePath $ "\n" <> modelsCode
   where

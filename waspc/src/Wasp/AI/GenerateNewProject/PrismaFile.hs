@@ -26,8 +26,11 @@ import Wasp.AI.LLM (ChatMessage (..), ChatRole (..))
 import Wasp.Psl.Format (PrismaFormatResult (..))
 import qualified Wasp.Psl.Format as Prisma
 import qualified Wasp.Util.Aeson as Utils.Aeson
+import StrongPath (Path', Rel, File')
+import qualified StrongPath as SP
+import Wasp.Project.Common (WaspProjectDir)
 
-fixPrismaFile :: NewProjectDetails -> FilePath -> Plan -> CodeAgent ()
+fixPrismaFile :: NewProjectDetails -> Path' (Rel WaspProjectDir) File' -> Plan -> CodeAgent ()
 fixPrismaFile newProjectDetails prismaFilePath plan = do
   currentPrismaFileContent <- getFile prismaFilePath <&> fromMaybe (error "couldn't find Prisma file to fix")
 

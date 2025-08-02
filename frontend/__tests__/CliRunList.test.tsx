@@ -17,5 +17,7 @@ jest.mock("../hooks/useCliRuns", () => () => ({
 
 test("renders cli runs", () => {
   render(<CliRunList />);
-  expect(screen.getByText(/echo hi/)).toBeInTheDocument();
+  const link = screen.getByRole("link", { name: /echo hi/ });
+  expect(link).toBeInTheDocument();
+  expect(link).toHaveAttribute("href", "/cli-runs/1");
 });

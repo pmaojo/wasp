@@ -32,6 +32,11 @@ export async function listRuns(): Promise<CliRun[]> {
   return readFile();
 }
 
+export async function getRun(id: string): Promise<CliRun | undefined> {
+  const runs = await readFile();
+  return runs.find((r) => r.id === id);
+}
+
 export async function recordRun(data: {
   command: string;
   args: string[];

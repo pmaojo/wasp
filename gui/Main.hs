@@ -21,6 +21,7 @@ instance FrontController RootApplication where
           , parseRoute @"/CliRuns" CliRunsAction
           , parseRoute @"/Cli" CliAction
           , parseRoute @"/Admin" AdminAction
+          , parseRoute @"/Admin/RunCli" RunCliAction
           , parseRoute @"/Users.json" UsersJsonAction
           , parseRoute @"/Posts.json" PostsJsonAction
           , parseRoute @"/CliRuns.json" CliRunsJsonAction

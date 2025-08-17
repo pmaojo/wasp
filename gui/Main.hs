@@ -11,6 +11,7 @@ import Application.Controller.UsersController
 import Application.Controller.PostsController
 import Application.Controller.CliRunsController
 import Application.Controller.CliController
+import Application.Controller.AdminController
 
 instance FrontController RootApplication where
     controllers =
@@ -19,6 +20,7 @@ instance FrontController RootApplication where
           , parseRoute @"/Users" UsersAction
           , parseRoute @"/CliRuns" CliRunsAction
           , parseRoute @"/Cli" CliAction
+          , parseRoute @"/Admin" AdminAction
           , parseRoute @"/Users.json" UsersJsonAction
           , parseRoute @"/Posts.json" PostsJsonAction
           , parseRoute @"/CliRuns.json" CliRunsJsonAction

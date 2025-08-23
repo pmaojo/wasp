@@ -1,4 +1,4 @@
-import { CliRun, listRuns, recordRun } from "../lib/cliRunStore";
+import { CliRun, getRun as fetchRun, listRuns, recordRun } from "../lib/cliRunStore";
 import { runCommand } from "../lib/runCommand";
 
 export interface CommandSpec {
@@ -24,4 +24,8 @@ export async function executeCommand({ command, args }: CommandSpec): Promise<Cl
 
 export async function getRuns(): Promise<CliRun[]> {
   return listRuns();
+}
+
+export async function getRun(id: string): Promise<CliRun | undefined> {
+  return fetchRun(id);
 }

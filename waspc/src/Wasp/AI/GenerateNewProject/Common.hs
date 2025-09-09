@@ -94,7 +94,11 @@ instance Aeson.FromJSON AuthProvider where
     _ -> fail "invalid auth provider"
 
 -- TODO: Make these relative to WaspProjectDir, via StrongPath?
-type File = (FilePath, Text)
+import StrongPath (Path', Rel, File')
+import qualified StrongPath as SP
+import Wasp.Project.Common (WaspProjectDir)
+
+type File = (Path' (Rel WaspProjectDir) File', Text)
 
 queryLLMForJSON :: FromJSON a => ChatGPTParams -> [ChatMessage] -> CodeAgent a
 queryLLMForJSON chatGPTParams initChatMsgs = doQueryForJSON 0 0 initChatMsgs
@@ -172,7 +176,7 @@ planningChatGPTParams projectDetails =
 fixingChatGPTParams :: ChatGPTParams -> ChatGPTParams
 fixingChatGPTParams params = params {GPT._temperature = subtract 0.2 <$> GPT._temperature params}
 
-writeToWaspFileEnd :: FilePath -> Text -> CodeAgent ()
+writeToWaspFileEnd :: Path' (Rel WaspProjectDir) File' -> Text -> CodeAgent ()
 writeToWaspFileEnd waspFilePath text = do
   CA.writeToFile waspFilePath $
     (<> "\n" <> text) . fromMaybe (error "wasp file shouldn't be empty")

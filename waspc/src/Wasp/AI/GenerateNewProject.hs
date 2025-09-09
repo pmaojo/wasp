@@ -8,7 +8,9 @@ import Data.Function ((&))
 import Data.List (nub)
 import Data.String (fromString)
 import Data.Text (Text)
-import StrongPath (File', Path, Rel, System)
+import StrongPath (File', Path, Rel, System, Path')
+import qualified StrongPath as SP
+import Wasp.Project.Common (WaspProjectDir)
 import Text.Printf (printf)
 import Wasp.AI.CodeAgent (getTotalTokensUsage, writeToLog)
 import Wasp.AI.GenerateNewProject.Common
@@ -99,13 +101,13 @@ generateNewProject newProjectDetails waspProjectSkeletonFiles = do
   writeToLogFixing "mistakes in NodeJS operation files..."
   forM_ (nub $ getOperationJsFilePath <$> (queries <> actions)) $ \opFp -> do
     fixOperationsJsFile newProjectDetails waspFilePath opFp
-    writeToLog $ "Fixed NodeJS operation file '" <> fromString opFp <> "'."
+    writeToLog $ "Fixed NodeJS operation file '" <> fromString (SP.toFilePath opFp) <> "'."
   writeToLog "NodeJS operation files fixed."
 
   writeToLogFixing "common mistakes in pages..."
   forM_ (getPageComponentPath <$> pages) $ \pageFp -> do
     fixPageComponent newProjectDetails waspFilePath pageFp
-    writeToLog $ "Fixed '" <> fromString pageFp <> "' page."
+    writeToLog $ "Fixed '" <> fromString (SP.toFilePath pageFp) <> "' page."
   writeToLog "Pages fixed."
 
   (promptTokensUsed, completionTokensUsed) <- getTotalTokensUsage

@@ -10,7 +10,7 @@ module Wasp.AI.GenerateNewProject.Page
 where
 
 import Data.Aeson (FromJSON)
-import Data.List (isPrefixOf)
+import Data.List (isPrefixOf, stripPrefix)
 import Data.Maybe (fromMaybe)
 import Data.String (fromString)
 import Data.Text (Text)
@@ -30,9 +30,12 @@ import Wasp.AI.GenerateNewProject.Entity (entityPlanToPrismaModelText)
 import Wasp.AI.GenerateNewProject.Operation (Operation (opImpl, opPlan), OperationImpl (opJsImpl))
 import qualified Wasp.AI.GenerateNewProject.Plan as Plan
 import Wasp.AI.LLM (ChatMessage (..), ChatRole (..))
+import StrongPath (Path', Rel, File', parseRelFile)
+import qualified StrongPath as SP
+import Wasp.Project.Common (WaspProjectDir)
 
 generateAndWritePage ::
-  NewProjectDetails -> FilePath -> [Plan.Entity] -> [Operation] -> [Operation] -> Plan.Page -> CodeAgent Page
+  NewProjectDetails -> Path' (Rel WaspProjectDir) File' -> [Plan.Entity] -> [Operation] -> [Operation] -> Plan.Page -> CodeAgent Page
 generateAndWritePage newProjectDetails waspFilePath entityPlans queries actions pPlan = do
   page <- generatePage newProjectDetails entityPlans queries actions pPlan
   writePageToJsFile page
@@ -295,14 +298,15 @@ writePageToJsFile page =
     path = getPageComponentPath page
     jsImpl = T.pack $ pageJsImpl $ pageImpl page
 
-getPageComponentPath :: Page -> String
-getPageComponentPath page = path
-  where
-    path = resolvePath $ Plan.componentPath $ pagePlan page
-    resolvePath p | "@src/" `isPrefixOf` p = drop (length ("@" :: String)) p
-    resolvePath _ = error "path incorrectly formatted, should start with @src/."
+getPageComponentPath :: Page -> Path' (Rel WaspProjectDir) File'
+getPageComponentPath page =
+  case stripPrefix "@src/" (Plan.componentPath $ pagePlan page) of
+    Just p -> case SP.parseRelFile p of
+      Just fp -> fp
+      Nothing -> error "failed to parse component path"
+    Nothing -> error "path incorrectly formatted, should start with @src/"
 
-writePageToWaspFile :: FilePath -> Page -> CodeAgent ()
+writePageToWaspFile :: Path' (Rel WaspProjectDir) File' -> Page -> CodeAgent ()
 writePageToWaspFile waspFilePath page =
   writeToWaspFileEnd waspFilePath $ "\n" <> T.pack (pageWaspDecl $ pageImpl page)
 

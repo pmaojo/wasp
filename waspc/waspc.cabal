@@ -159,7 +159,6 @@ library
 
   other-modules: Paths_waspc
   exposed-modules:
-    FilePath.Extra
     Wasp.AI.CodeAgent
     Wasp.AI.GenerateNewProject
     Wasp.AI.GenerateNewProject.Common

@@ -14,7 +14,6 @@ import StrongPath.TH (relfile)
 import System.FilePath.Glob (Pattern, compile, match)
 import System.IO.Error (isDoesNotExistError)
 import UnliftIO.Exception (catch, throwIO)
-import Wasp.AppSpec.ExternalFiles (SourceExternalCodeDir, SourceExternalPublicDir)
 import Wasp.Project.Common
 import qualified Wasp.Util.IO as IOUtil
 
@@ -22,12 +21,10 @@ class AffectedByWaspignoreFile a
 
 newtype WaspignoreFile = WaspignoreFile [Pattern]
 
-instance AffectedByWaspignoreFile SourceExternalCodeDir
-
-instance AffectedByWaspignoreFile SourceExternalPublicDir
+instance AffectedByWaspignoreFile UserSrcDir
 
 getNotIgnoredRelFilePaths ::
-  AffectedByWaspignoreFile d =>
+  (AffectedByWaspignoreFile d) =>
   Path' Abs File' ->
   Path' Abs (Dir d) ->
   IO [Path' (Rel d) File']
@@ -40,7 +37,7 @@ waspIgnorePathInWaspProjectDir = [relfile|.waspignore|]
 
 -- | These patterns are ignored by every 'WaspignoreFile'
 defaultIgnorePatterns :: [Pattern]
-defaultIgnorePatterns = map compile [".waspignore"]
+defaultIgnorePatterns = [compile ".waspignore"]
 
 -- | Parses a string to a 'WaspignoreFile'.
 --

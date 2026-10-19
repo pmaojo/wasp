@@ -1,14 +1,14 @@
 {{={= =}=}}
 
-import { Server } from 'socket.io'
-import { EventsMap, DefaultEventsMap } from '@socket.io/component-emitter'
+import type { Server } from 'socket.io'
+import type { EventsMap, DefaultEventsMap } from '@socket.io/component-emitter'
 
-import { prisma } from 'wasp/server'
+import type { prisma } from '../index'
+import type { FromRegister } from '../../types/register'
 {=# isAuthEnabled =}
-import { type AuthUser } from 'wasp/auth'
+import type { AuthUser } from '../../auth/user.js'
 {=/ isAuthEnabled =}
 
-{=& userWebSocketFn.importStatement =}
 
 // Public API
 export type WebSocketDefinition<
@@ -40,18 +40,17 @@ export interface WaspSocketData {
 }
 
 // PRIVATE API (framework)
-export type ServerType = Parameters<WebSocketFn>[0]
+export type ServerType = Parameters<RegisteredWebSocketFn>[0]
 
 // PRIVATE API (sdk)
 export type ClientToServerEvents = Events[0]
 // PRIVATE API (sdk)
 export type ServerToClientEvents = Events[1]
 
-type WebSocketFn = typeof {= userWebSocketFn.importIdentifier =}
+type RegisteredWebSocketFn = FromRegister<'webSocketFn', WebSocketDefinition>;
 type Events = ServerType extends Server<
   infer ClientToServerEvents,
   infer ServerToClientEvents
 >
   ? [ClientToServerEvents, ServerToClientEvents]
   : [DefaultEventsMap, DefaultEventsMap]
-

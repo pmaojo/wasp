@@ -1,0 +1,145 @@
+module Wasp.Validator where
+
+import Data.Bifunctor (first)
+import Data.Functor (void)
+import Data.List (intercalate)
+import Data.List.NonEmpty (NonEmpty)
+import qualified Data.List.NonEmpty as NE
+import Data.Maybe (catMaybes)
+import qualified Validation as V
+import Wasp.Util (indent)
+
+type Validator input = input -> Validation
+
+type Validation = V.Validation (NonEmpty ValidationError) ()
+
+data ValidationError = ValidationError
+  { message :: String,
+    fieldPath :: [String],
+    fileName :: Maybe String
+  }
+  deriving (Eq)
+
+-- | Executes the given validator on the input and returns a list of validation errors. If there are
+-- no errors, returns an empty list.
+execValidator :: Validator input -> input -> [ValidationError]
+execValidator validator value =
+  V.validation NE.toList (const []) $ validator value
+
+-- | Combines multiple validators into one that succeeds only if all of them succeed.
+-- Accumulates errors.
+all :: [Validator a] -> Validator a
+all vs = void . V.validateAll vs
+
+-- | Combines two validators into one that succeeds only if both succeed.
+-- Short-circuits on the first failure.
+and :: Validator input -> Validator input -> Validator input
+and v1 v2 value
+  | V.isFailure result1 = result1
+  | otherwise = result2
+  where
+    result1 = v1 value
+    result2 = v2 value
+
+-- | Adds file name context to validation errors produced by the inner validator.
+withFileName :: String -> Validator a -> Validator a
+withFileName fileName' innerValidator =
+  mapErrors setFileName . innerValidator
+  where
+    setFileName err = err {fileName = Just fileName'}
+
+-- | Runs the validator on a specific field of the input, adding the field name to the error path.
+inField :: (String, a -> b) -> Validator b -> Validator a
+inField (fieldName, fieldGetter) innerValidator =
+  withFieldName fieldName . innerValidator . fieldGetter
+
+-- | Adds a field name to the error path for a validation result.
+-- Unlike 'inField', this doesn't extract a field - use this when you already
+-- have the value and just need to add context to errors.
+withFieldName :: String -> Validation -> Validation
+withFieldName fieldName = mapErrors prependFieldName
+  where
+    prependFieldName err = err {fieldPath = fieldName : fieldPath err}
+
+mapErrors :: (ValidationError -> ValidationError) -> Validation -> Validation
+mapErrors = first . fmap
+
+success :: Validation
+success = pure ()
+
+failure :: String -> Validation
+failure message' =
+  V.failure $
+    ValidationError
+      { message = message',
+        fieldPath = [],
+        fileName = Nothing
+      }
+
+-- | Validates that the value is equal to the expected value.
+eq :: (Eq a, Show a) => a -> Validator a
+eq expected actual
+  | actual == expected = success
+  | otherwise =
+      failure $ "Expected " ++ show expected ++ " but got " ++ show actual ++ "."
+
+-- | Validates that the value is one of the allowed values.
+oneOf :: (Eq a, Show a) => [a] -> Validator a
+oneOf allowed actual
+  | actual `elem` allowed = success
+  | otherwise =
+      failure $ "Expected one of " ++ show allowed ++ " but got " ++ show actual ++ "."
+
+-- | Validates that the value exists and is equal to the expected value.
+eqJust :: (Eq a, Show a) => a -> Validator (Maybe a)
+eqJust expected =
+  requiredWith ("Missing value, expected " ++ show expected ++ ".") (eq expected)
+
+-- | Validates that the value exists and is one of the allowed values.
+oneOfJust :: (Eq a, Show a) => [a] -> Validator (Maybe a)
+oneOfJust allowed =
+  requiredWith ("Missing value, expected one of " ++ show allowed ++ ".") (oneOf allowed)
+
+-- | Validates that the list contains all of the expected elements. Additional
+-- elements are allowed. Combine with 'required' or 'ifJust' to validate an
+-- optional field.
+containsAll :: (Eq a, Show a) => [a] -> Validator [a]
+containsAll expected actual
+  | Prelude.all (`elem` actual) expected = success
+  | otherwise =
+      failure $ "Expected to contain all of " ++ show expected ++ " but got " ++ show actual ++ "."
+
+-- | Runs the inner validator only if the value is Just. If the value is
+-- Nothing, no validation is needed and the validation succeeds.
+ifJust :: Validator a -> Validator (Maybe a)
+ifJust = maybe success
+
+-- | Validates that the value exists, then runs the inner validator on it.
+required :: Validator a -> Validator (Maybe a)
+required = requiredWith "Missing required value."
+
+-- | Validates that the value exists, then runs the inner validator on it.
+-- Reports the given message when the value is missing.
+requiredWith :: String -> Validator a -> Validator (Maybe a)
+requiredWith missingValueMessage _ Nothing = failure missingValueMessage
+requiredWith _ innerValidator (Just value) = innerValidator value
+
+instance Show ValidationError where
+  show
+    ( ValidationError
+        { message = message',
+          fieldPath = fieldPath',
+          fileName = fileName'
+        }
+      )
+      | null context = message'
+      | otherwise = unlines [contextLine, indent 4 message']
+      where
+        contextLine = "In " ++ intercalate " → " context ++ ":"
+        context = catMaybes [fileNamePart, fieldPathPart]
+
+        fileNamePart = show <$> fileName'
+
+        fieldPathPart
+          | null fieldPath' = Nothing
+          | otherwise = Just $ show $ intercalate "." fieldPath'

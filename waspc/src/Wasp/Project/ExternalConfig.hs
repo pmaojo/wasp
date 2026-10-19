@@ -1,37 +1,46 @@
 module Wasp.Project.ExternalConfig
-  ( readExternalConfigs,
+  ( parseAndValidateExternalConfigs,
     ExternalConfigs (..),
   )
 where
 
-import Control.Monad.Except (ExceptT (ExceptT), runExceptT)
-import StrongPath (Abs, Dir, File, Path', Rel)
+import StrongPath (Abs, Dir, Path')
+import Validation (validationToEither)
 import Wasp.ExternalConfig.Npm.PackageJson (PackageJson)
-import Wasp.ExternalConfig.TsConfig (TsConfig)
 import Wasp.Project.Common
   ( CompileError,
-    SrcTsConfigFile,
+    TsConfigPaths (..),
     WaspProjectDir,
   )
-import Wasp.Project.ExternalConfig.PackageJson (readPackageJsonFile)
-import Wasp.Project.ExternalConfig.TsConfig (readSrcTsConfigFile)
+import Wasp.Project.ExternalConfig.PackageJson (parseAndValidateUserPackageJson)
+import Wasp.Project.ExternalConfig.RootTsConfig (parseAndValidateRootTsConfig)
+import Wasp.Project.ExternalConfig.SrcTsConfig (parseAndValidateSrcTsConfig)
+import Wasp.Project.ExternalConfig.ViteConfig (validateViteConfig)
+import Wasp.Project.ExternalConfig.WaspTsConfig (parseAndValidateWaspTsConfig)
 
-data ExternalConfigs = ExternalConfigs
-  { _packageJson :: PackageJson,
-    _srcTsConfig :: TsConfig
+newtype ExternalConfigs = ExternalConfigs
+  { _packageJson :: PackageJson
   }
   deriving (Show)
 
-readExternalConfigs ::
+parseAndValidateExternalConfigs ::
   Path' Abs (Dir WaspProjectDir) ->
-  Path' (Rel WaspProjectDir) (File SrcTsConfigFile) ->
-  IO (Either CompileError ExternalConfigs)
-readExternalConfigs waspDir srcTsConfigPath = runExceptT $ do
-  packageJsonContent <- ExceptT $ readPackageJsonFile waspDir
-  srcTsConfigContent <- ExceptT $ readSrcTsConfigFile waspDir srcTsConfigPath
+  TsConfigPaths ->
+  IO (Either [CompileError] ExternalConfigs)
+parseAndValidateExternalConfigs waspDir tsConfigPaths@TsConfigPaths {srcTsConfig, waspTsConfig, rootTsConfig} = do
+  -- NOTE: We use Validation instead of Either because we don't want to fail
+  -- early. We want to collect all validation errors.
+  packageJsonOrErrors <- parseAndValidateUserPackageJson waspDir tsConfigPaths
+  srcTsConfigOrErrors <- parseAndValidateSrcTsConfig waspDir srcTsConfig
+  maybeWaspTsConfigOrErrors <- traverse (parseAndValidateWaspTsConfig waspDir) waspTsConfig
+  maybeRootTsConfigOrErrors <- traverse (parseAndValidateRootTsConfig waspDir) rootTsConfig
+  unitOrViteConfigErrors <- validateViteConfig waspDir
 
-  return $
-    ExternalConfigs
-      { _packageJson = packageJsonContent,
-        _srcTsConfig = srcTsConfigContent
-      }
+  return
+    $ validationToEither
+    $ ExternalConfigs
+      <$> packageJsonOrErrors
+      <* srcTsConfigOrErrors
+      <* sequenceA maybeWaspTsConfigOrErrors
+      <* sequenceA maybeRootTsConfigOrErrors
+      <* unitOrViteConfigErrors

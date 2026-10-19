@@ -1,12 +1,11 @@
-import { useContext, useEffect } from 'react'
-import { useLocation } from 'react-router-dom'
+import { useAuthContext } from '@wasp.sh/lib-auth/browser'
+import { useLocation } from 'react-router'
 import { verifyEmail } from '../../../email/actions/verifyEmail.js'
-import { Message } from '../Message'
-import { AuthContext } from '../../Auth'
+import { Message, useEffectOnce, getAuthErrorMessage } from '@wasp.sh/lib-sdk-core/browser'
 
 // PRIVATE API
 export const VerifyEmailForm = () => {
-  const { isLoading, setErrorMessage, setSuccessMessage, setIsLoading } = useContext(AuthContext)
+  const { isLoading, setErrorMessage, setSuccessMessage, setIsLoading } = useAuthContext()
   const location = useLocation()
   const token = new URLSearchParams(location.search).get('token')
 
@@ -24,19 +23,16 @@ export const VerifyEmailForm = () => {
     try {
       await verifyEmail({ token })
       setSuccessMessage('Your email has been verified. You can now log in.')
-    } catch (error) {
-      setErrorMessage({
-        title: error.message,
-        description: error.data?.data?.message,
-      })
+    } catch (error: unknown) {
+      setErrorMessage(getAuthErrorMessage(error));
     } finally {
       setIsLoading(false)
     }
   }
 
-  useEffect(() => {
+  useEffectOnce(() => {
     submitForm()
-  }, [location])
+  })
 
   return <>{isLoading && <Message>Verifying email...</Message>}</>
 }

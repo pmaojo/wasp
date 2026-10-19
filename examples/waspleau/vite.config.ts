@@ -1,7 +1,9 @@
-import { defineConfig } from "vite";
+import { defineConfig } from "vitest/config";
+import { wasp } from "wasp/client/vite";
 
 export default defineConfig({
-  server: {
-    open: true,
+  plugins: [wasp()],
+  test: {
+    exclude: ["./e2e-tests/**"],
   },
 });

@@ -1,0 +1,89 @@
+module Wasp.Generator.SdkGenerator.Client.VitePluginG (genVitePlugins) where
+
+import Data.Aeson (object, (.=))
+import Data.Maybe (fromJust)
+import StrongPath (relfile, (</>))
+import qualified StrongPath as SP
+import qualified System.FilePath.Posix as FP.Posix
+import Wasp.AppSpec (AppSpec)
+import qualified Wasp.AppSpec as AS
+import qualified Wasp.AppSpec.Route as AS.Route
+import Wasp.Generator.Common (makeJsArrayFromHaskellList)
+import Wasp.Generator.FileDraft (FileDraft)
+import Wasp.Generator.Monad (Generator)
+import Wasp.Generator.SdkGenerator.Client.VitePlugin.Common (clientEntryPointPath, spaFallbackFile, ssrEntryPointPath)
+import Wasp.Generator.SdkGenerator.Client.VitePlugin.VirtualUserModulesPluginG (genVirtualUserModulesPlugin)
+import Wasp.Generator.SdkGenerator.Client.VitePlugin.VirtualWaspModulesPluginG (genVirtualWaspModulesPlugin)
+import Wasp.Generator.SdkGenerator.Common (sdkPackageName)
+import qualified Wasp.Generator.SdkGenerator.Common as C
+import Wasp.Generator.WebAppGenerator (viteBuildDirPath)
+import qualified Wasp.Generator.WebAppGenerator.Common as WebApp
+import Wasp.Project.Common
+  ( dotWaspDirInWaspProjectDir,
+    generatedAppDirInWaspProjectDir,
+    srcDirInWaspProjectDir,
+  )
+import Wasp.Project.Env (dotEnvClient)
+import Wasp.Util ((<++>))
+import Wasp.Util.Js (makeJsStringLiteral)
+
+genVitePlugins :: AppSpec -> Generator [FileDraft]
+genVitePlugins spec =
+  sequence
+    [ genViteIndex,
+      genWaspPlugin spec,
+      genWaspConfigPlugin spec,
+      genVirtualUserModulesPlugin spec
+    ]
+    <++> genVirtualWaspModulesPlugin spec
+
+genViteIndex :: Generator FileDraft
+genViteIndex = return $ C.mkTmplFd tmplPath
+  where
+    tmplPath = C.viteDirInSdkTemplatesDir </> [relfile|index.ts|]
+
+genWaspPlugin :: AppSpec -> Generator FileDraft
+genWaspPlugin spec = return $ C.mkTmplFdWithData tmplPath tmplData
+  where
+    tmplPath = C.vitePluginsDirInSdkTemplatesDir </> [relfile|wasp.ts|]
+    tmplData =
+      object
+        [ "clientEntryPointPath" .= clientEntryPointPath,
+          "clientEnvFileName" .= SP.fromRelFile dotEnvClient,
+          "clientEnvSchemaValidationModulePath" .= clientEnvSchemaValidationModulePath,
+          "srcDirInWaspProjectDir" .= SP.fromRelDir srcDirInWaspProjectDir,
+          "srcTsConfigPath" .= SP.fromRelFile (AS.srcTsConfigPath spec),
+          "ssrEntryPointPath" .= ssrEntryPointPath,
+          "spaFallbackFile" .= SP.fromRelFileP spaFallbackFile,
+          "ssrPaths" .= makeJsArrayFromHaskellList prerenderPaths
+        ]
+    prerenderPaths =
+      concatMap AS.Route.prerender (AS.getRoutes spec)
+    clientEnvSchemaValidationModulePath = SP.fromRelFileP . fromJust . SP.relFileToPosix $ clientEnvSchemaValidationModuleDir
+    clientEnvSchemaValidationModuleDir = generatedAppDirInWaspProjectDir </> C.sdkRootDirInGeneratedAppDir </> [relfile|client/env.ts|]
+
+genWaspConfigPlugin :: AppSpec -> Generator FileDraft
+genWaspConfigPlugin spec = return $ C.mkTmplFdWithData tmplPath tmplData
+  where
+    tmplPath = C.vitePluginsDirInSdkTemplatesDir </> [relfile|waspConfig.ts|]
+    tmplData =
+      object
+        [ "baseDir" .= makeJsStringLiteral (SP.fromAbsDirP (WebApp.getBaseDir spec)),
+          "clientPortEnvVarName" .= WebApp.clientPortEnvVarName,
+          "clientBuildDirPath" .= SP.fromRelDir viteBuildDirPath,
+          "depsExcludedFromOptimization" .= makeJsArrayFromHaskellList depsExcludedFromOptimization,
+          "vitest"
+            .= object
+              [ "setupFilesArray" .= makeJsArrayFromHaskellList ["wasp/client/test/setup"],
+                "excludeWaspArtefactsPattern" .= (SP.fromRelDirP (fromJust $ SP.relDirToPosix dotWaspDirInWaspProjectDir) FP.Posix.</> "**" FP.Posix.</> "*")
+              ]
+        ]
+
+    depsExcludedFromOptimization =
+      -- Why do we exclude Wasp SDK from optimization?
+      -- - Wasp SDK is a dep that's regenerated over time and we don't want Vite to optimize it
+      --   and cache it (which would break hot module reloading).
+      -- - Accidentally, we don't need to do this because Wasp SDK is symlinked and Vite would
+      --   exclude it anyways - but we are keeping it here because we want to be explicit.
+      --   Read more: https://vite.dev/guide/dep-pre-bundling#monorepos-and-linked-dependencies
+      [sdkPackageName]

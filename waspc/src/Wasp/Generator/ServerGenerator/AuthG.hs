@@ -30,18 +30,19 @@ import Wasp.Generator.AuthProviders
     gitHubAuthProvider,
     googleAuthProvider,
     keycloakAuthProvider,
-    localAuthProvider,
+    microsoftAuthProvider,
     slackAuthProvider,
+    usernameAndPasswordAuthProvider,
   )
 import qualified Wasp.Generator.AuthProviders.Email as EmailProvider
-import qualified Wasp.Generator.AuthProviders.Local as LocalProvider
 import qualified Wasp.Generator.AuthProviders.OAuth as OAuthProvider
+import qualified Wasp.Generator.AuthProviders.UsernameAndPassword as UsernameAndPasswordProvider
 import Wasp.Generator.FileDraft (FileDraft)
 import Wasp.Generator.JsImport (jsImportToImportJson)
 import Wasp.Generator.Monad (Generator)
 import Wasp.Generator.ServerGenerator.Auth.EmailAuthG (genEmailAuth)
-import Wasp.Generator.ServerGenerator.Auth.LocalAuthG (genLocalAuth)
 import Wasp.Generator.ServerGenerator.Auth.OAuthAuthG (genOAuthAuth)
+import Wasp.Generator.ServerGenerator.Auth.UsernameAndPasswordAuthG (genUsernameAndPasswordAuth)
 import qualified Wasp.Generator.ServerGenerator.Common as C
 import Wasp.Generator.ServerGenerator.JsImport (extImportToAliasedImportJson)
 import qualified Wasp.JsImport as JI
@@ -58,11 +59,11 @@ genAuth spec = case maybeAuth of
         genProvidersIndex auth,
         genAuthHooks auth
       ]
-      <++> genLocalAuth auth
+      <++> genUsernameAndPasswordAuth auth
       <++> genOAuthAuth auth
       <++> genEmailAuth spec auth
   where
-    maybeAuth = AS.App.auth $ snd $ getApp spec
+    maybeAuth = AS.App.auth $ getApp spec
     genFileCopy = return . C.mkSrcTmplFd
 
 genAuthRoutesIndex :: AS.Auth.Auth -> Generator FileDraft
@@ -93,18 +94,20 @@ genProvidersIndex auth = return $ C.mkTmplFdWithData [relfile|src/auth/providers
             [OAuthProvider.providerId gitHubAuthProvider | AS.Auth.isGitHubAuthEnabled auth],
             [OAuthProvider.providerId googleAuthProvider | AS.Auth.isGoogleAuthEnabled auth],
             [OAuthProvider.providerId keycloakAuthProvider | AS.Auth.isKeycloakAuthEnabled auth],
-            [LocalProvider.providerId localAuthProvider | AS.Auth.isUsernameAndPasswordAuthEnabled auth],
+            [OAuthProvider.providerId microsoftAuthProvider | AS.Auth.isMicrosoftAuthEnabled auth],
+            [UsernameAndPasswordProvider.providerId usernameAndPasswordAuthProvider | AS.Auth.isUsernameAndPasswordAuthEnabled auth],
             [EmailProvider.providerId emailAuthProvider | AS.Auth.isEmailAuthEnabled auth]
           ]
 
     makeConfigImportJson providerId =
-      jsImportToImportJson $
-        Just $
-          JI.JsImport
-            { JI._path = JI.RelativeImportPath $ [reldirP|./config|] </> (fromJust . SP.parseRelFileP $ providerId <> ".js"),
-              JI._name = JI.JsImportModule providerId,
-              JI._importAlias = Nothing
-            }
+      jsImportToImportJson
+        $ Just
+        $ JI.JsImport
+          { JI._kind = JI.ValueImport,
+            JI._path = JI.RelativeImportPath $ [reldirP|./config|] </> (fromJust . SP.parseRelFileP $ providerId <> ".js"),
+            JI._name = JI.JsImportModule providerId,
+            JI._importAlias = Nothing
+          }
 
 genAuthHooks :: AS.Auth.Auth -> Generator FileDraft
 genAuthHooks auth = return $ C.mkTmplFdWithData [relfile|src/auth/hooks.ts|] (Just tmplData)
@@ -131,11 +134,10 @@ genAuthHooks auth = return $ C.mkTmplFdWithData [relfile|src/auth/hooks.ts|] (Ju
 depsRequiredByAuth :: AppSpec -> [Npm.Dependency.Dependency]
 depsRequiredByAuth spec = maybe [] (const authDeps) maybeAuth
   where
-    maybeAuth = AS.App.auth $ snd $ getApp spec
+    maybeAuth = AS.App.auth $ getApp spec
     authDeps =
       Npm.Dependency.fromList
         [ ("lucia", "^3.0.1"),
-          ("oslo", "^1.1.2"),
           ("@lucia-auth/adapter-prisma", "^4.0.0")
         ]
 

@@ -10,14 +10,14 @@ It consists of three main parts:
 
 ### Installation
 
-```
-$ npm install
+```sh
+npm install
 ```
 
 ### Local Development
 
-```
-$ npm start
+```sh
+npm start
 ```
 
 This command starts a local development server and opens up a browser window.
@@ -33,13 +33,26 @@ We have a few guides on how to write documentation:
 
 ### Build
 
-```
-$ npm build
+```sh
+npm build
 ```
 
 This command generates static content into the `build` directory and can be served using any static contents hosting service.
 
 To run this version of code and check that it works correctly, run `npm run serve`.
+
+### LLM file snapshots
+
+The build also generates markdown versions of pages and `llms*.txt` files (see [src/plugins/llm-files](src/plugins/llm-files/)). To catch unintended changes in that output, we keep snapshots of a few representative files in [markdown-snapshots/](markdown-snapshots/) and compare them against the build output in CI. The snapshots track the "current" (next, unreleased) docs version, so we have to build the dev version of the docs.
+
+If the check fails and the changes are intended, update the snapshots and commit the result:
+
+``` sh
+npm run build-dev
+npm run markdown-snapshots:update
+```
+
+NOTE: Files in `static/` dir can override whatever is generate on build. Make sure you don't have any stale static files.
 
 ### Deployment
 
@@ -47,20 +60,21 @@ We deploy the website to Cloudflare Pages. When you want to deploy changes from 
 
 1. Make sure you have the `release` branch ready with all the changes you want to deploy.
 2. Check out the `deploy-web` branch:
-```
+```sh
 git checkout deploy-web
-```
+```sh
 3. Merge the `release` branch into `deploy-web`:
-```
+```sh
 git merge release
 ```
 4. Push the `deploy-web` branch to the remote:
-```
+```sh
 git push
 ```
 5. Cloudflare Pages will automatically pick up the changes and deploy them.
-6. Go back to the `release` branch so you don't accidentally commit to `deploy-web`:
-```
+6. Check that the [Algolia docs search crawler restart](https://github.com/wasp-lang/wasp/actions/workflows/automation-algolia-restart-crawler.yaml) succeeded.
+7. Go back to the `release` branch so you don't accidentally commit to `deploy-web`:
+```sh
 git checkout release
 ```
 
@@ -100,6 +114,10 @@ Since we don't want our users to read `docs/next` ("current" docs), we don't pub
 
 When releasing new version of Wasp, what we do is run `npm run docusaurus docs:version {version}` to create new versioned docs from the current docs. We do this on every new Wasp release.
 
+The version should not be a full version (e.g. `0.21.0`), but valid for all the non-breaking changes in that range (e.g. `0.21`).
+
+Note: This means users can't access docs for a specific patch version (e.g., `0.21.2`) - they always see the docs for the latest patch in that minor version (e.g., `0.21.4`). This could lead to users reading about features not yet available in their exact version. We consider this an acceptable trade-off for now, since upgrading within the same minor version has no breaking changes. We may revisit this approach in the future if needed.
+
 This command does everything for us, and since we use Docusaurus' default settings for versions,
 there is nothing else we need to do, it will be picked up as the latest version by default.
 
@@ -107,7 +125,7 @@ there is nothing else we need to do, it will be picked up as the latest version 
 
 If you are writing/updating docs on `main` for the new release of Wasp, you should edit "current" docs (docs/).
 
-If you are (hot)fixing currently published docs on `release`, then you should edit the versioned docs (versioned_docs/{version}), for whatever version you want to do this for. If you want this change to also be present in all the new docs, then you should also do it for the "current" docs (docs/) (yes, that means duplicating the same change).
+If you are (hot)fixing currently published docs on `release`, then you should edit the current docs (docs/), and then regenerate the versioned docs for the current version (versioned_docs/{version}), for whatever version you want to do this for. You can do that by running `npm run remove-version {version}` to remove the old versioned docs, and then `npm run docusaurus docs:version {version}` to create new versioned docs from the current docs.
 
 Prefer doing doc edits on `main`, as that keeps the whole process simpler, and do changes to docs on `release` only if it really matters to fix the already published versioned docs.
 

@@ -3,26 +3,32 @@ module Wasp.Cli.Command.Call where
 data Call
   = New Arguments
   | NewAi Arguments
-  | Start
-  | StartDb
+  | Start Arguments
+  | StartDb Arguments
   | Clean
-  | Uninstall
-  | TsSetup
+  | Install
+  | Uninstall Arguments
   | Compile
+  | TsSetup
+  | Info
+  | GenerateBashCompletionScript
+  | WaspLS
   | Db Arguments -- db args
   | Build
+  | BuildStart Arguments
   | Version
+  | Doctor
   | Telemetry
   | Deps
   | Dockerfile
-  | Info
+  | Show Arguments
+  | News
   | Studio
   | PrintBashCompletionInstruction
-  | GenerateBashCompletionScript
   | BashCompletionListCommands
-  | WaspLS
   | Deploy Arguments -- deploy cmd passthrough args
   | Test Arguments -- "client" | "server", then test cmd passthrough args
   | Unknown Arguments -- all args
+  deriving (Eq)
 
 type Arguments = [String]

@@ -2,32 +2,37 @@ module Wasp.Generator
   ( writeWebAppCode,
     Wasp.Generator.Start.start,
     Wasp.Generator.Test.testWebApp,
-    ProjectRootDir,
+    GeneratedAppDir,
   )
 where
 
+import Control.Monad (forM_)
 import Data.List.NonEmpty (toList)
-import qualified Data.Text
-import qualified Data.Text.IO
-import Data.Time.Clock (getCurrentTime)
-import qualified Data.Version
-import qualified Paths_waspc
-import StrongPath (Abs, Dir, Path', relfile, (</>))
-import qualified StrongPath as SP
+import StrongPath (Abs, Dir, Path')
 import Wasp.AppSpec (AppSpec)
-import Wasp.Generator.Common (ProjectRootDir)
+import qualified Wasp.AppSpec as AS
+import qualified Wasp.ExternalConfig.Npm.Dependency as D
+import qualified Wasp.ExternalConfig.Npm.PackageJson as PJ
+import Wasp.Generator.Common (GeneratedAppDir)
 import Wasp.Generator.DbGenerator (genDb)
 import Wasp.Generator.DockerGenerator (genDockerFiles)
 import Wasp.Generator.FileDraft (FileDraft)
-import Wasp.Generator.Monad (Generator, GeneratorError, GeneratorWarning, runGenerator)
+import Wasp.Generator.Monad
+  ( Generator,
+    GeneratorError,
+    GeneratorWarning (GenericGeneratorWarning),
+    logGeneratorWarning,
+    runGenerator,
+  )
 import Wasp.Generator.SdkGenerator (genSdk)
 import Wasp.Generator.ServerGenerator (genServer)
-import Wasp.Generator.Setup (runSetup)
+import Wasp.Generator.Setup (SetupGoal, runSetup, setUpGeneratedApp)
 import qualified Wasp.Generator.Start
-import Wasp.Generator.TailwindConfigFileGenerator (genTailwindConfigFiles)
 import qualified Wasp.Generator.Test
-import Wasp.Generator.Valid (validateAppSpec)
-import Wasp.Generator.WebAppGenerator (genWebApp)
+import Wasp.Generator.TypeAugmentationGenerator (genTypeAugmentation)
+import Wasp.Generator.Valid (validateExternalConfigsWithAppSpec)
+import qualified Wasp.Generator.WaspInfo as WaspInfo
+import Wasp.Generator.WaspLibs (genWaspLibs)
 import Wasp.Generator.WriteFileDrafts (synchronizeFileDraftsWithDisk)
 import Wasp.Message (SendMessage)
 import Wasp.Util ((<++>))
@@ -40,9 +45,9 @@ import Wasp.Util ((<++>))
 --   NOTE(martin): What if there is already smth in the dstDir? It is probably best
 --     if we clean it up first? But we don't want this to end up with us deleting stuff
 --     from user's machine. Maybe we just overwrite and we are good?
-writeWebAppCode :: AppSpec -> Path' Abs (Dir ProjectRootDir) -> SendMessage -> IO ([GeneratorWarning], [GeneratorError])
-writeWebAppCode spec dstDir sendMessage = do
-  case validateAppSpec spec of
+writeWebAppCode :: AppSpec -> Path' Abs (Dir GeneratedAppDir) -> SendMessage -> SetupGoal -> IO ([GeneratorWarning], [GeneratorError])
+writeWebAppCode spec dstDir sendMessage setupGoal = do
+  case validateExternalConfigsWithAppSpec spec of
     validationErrors@(_ : _) -> return ([], validationErrors)
     [] -> do
       let (generatorWarnings, generatorResult) = runGenerator $ genApp spec
@@ -51,24 +56,29 @@ writeWebAppCode spec dstDir sendMessage = do
         Left generatorErrors -> return (generatorWarnings, toList generatorErrors)
         Right fileDrafts -> do
           synchronizeFileDraftsWithDisk dstDir fileDrafts
-          writeDotWaspInfo dstDir
-          (setupGeneratorWarnings, setupGeneratorErrors) <- runSetup spec dstDir sendMessage
+          WaspInfo.persist dstDir $ AS.buildType spec
+          (setupGeneratorWarnings, setupGeneratorErrors) <- runSetup $ setUpGeneratedApp setupGoal spec dstDir sendMessage
           return (generatorWarnings ++ setupGeneratorWarnings, setupGeneratorErrors)
 
 genApp :: AppSpec -> Generator [FileDraft]
-genApp spec =
-  genWebApp spec
-    <++> genServer spec
+genApp spec = do
+  warnOverriddenDeps spec
+
+  genServer spec
     <++> genSdk spec
     <++> genDb spec
     <++> genDockerFiles spec
-    <++> genTailwindConfigFiles spec
+    <++> genTypeAugmentation spec
+    <++> genWaspLibs
 
--- | Writes .waspinfo, which contains some basic metadata about how/when wasp generated the code.
-writeDotWaspInfo :: Path' Abs (Dir ProjectRootDir) -> IO ()
-writeDotWaspInfo dstDir = do
-  currentTime <- getCurrentTime
-  let version = Data.Version.showVersion Paths_waspc.version
-  let content = "Generated on " ++ show currentTime ++ " by waspc version " ++ show version ++ " ."
-  let dstPath = dstDir </> [relfile|.waspinfo|]
-  Data.Text.IO.writeFile (SP.toFilePath dstPath) (Data.Text.pack content)
+warnOverriddenDeps :: AppSpec -> Generator ()
+warnOverriddenDeps spec =
+  forM_ overriddenDepNames $ \pkgName ->
+    logGeneratorWarning
+      $ GenericGeneratorWarning
+      $ "Dependency override active for \""
+        ++ pkgName
+        ++ "\". You are using an unsupported version. "
+        ++ "Wasp cannot guarantee compatibility."
+  where
+    overriddenDepNames = D.name <$> PJ.getOverriddenDeps (AS.packageJson spec)

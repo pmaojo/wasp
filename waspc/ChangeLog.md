@@ -1,5 +1,415 @@
 # Changelog
 
+## Unreleased
+
+### 🐞 Bug fixes
+
+- `wasp new` now rejects more edge-cases of invalid project names. ([#4763](https://github.com/wasp-lang/wasp/issues/4763))
+- `wasp uninstall` no longer claims it removed Wasp data when there was nothing to remove. ([#5045](https://github.com/wasp-lang/wasp/pull/5045))
+
+## 0.26.0
+
+### ⚠️ Breaking Changes
+
+Remember to check out the [migration guide](https://wasp.sh/docs/0.26/migration-guide) for step-by-step documentation on how to upgrade.
+
+- Wasp now type-checks application code during compilation. ([#4942](https://github.com/wasp-lang/wasp/pull/4942))
+- Email fields in Wasp's auth forms now use `type="text"` to support internationalized addresses. ([#4695](https://github.com/wasp-lang/wasp/pull/4695))
+- SDK changes require updating `tsconfig.src.json` and copying the generated `types` directory in custom Dockerfiles. ([#4049](https://github.com/wasp-lang/wasp/pull/4049), [#4067](https://github.com/wasp-lang/wasp/pull/4067))
+- Renamed the `wasp deploy fly` flags `--vm-size`, `--initial-cluster-size`, and `--volume-size` to `--db-vm-size`, `--db-initial-cluster-size`, and `--db-volume-size`, respectively. ([#4642](https://github.com/wasp-lang/wasp/pull/4642))
+- `wasp deploy fly` now requires Fly CLI version 0.4.82 or newer. ([#4642](https://github.com/wasp-lang/wasp/pull/4642))
+- Wasp Deploy for Railway now requires Railway CLI 5.28.0 or newer. ([#4712](https://github.com/wasp-lang/wasp/pull/4712))
+- Moved internal server-only import paths under the `wasp/server/...` prefix. These paths are not part of the documented public API, but if your app imported any of them, update the import path or switch to documented public imports like `wasp/server/auth`. ([#4557](https://github.com/wasp-lang/wasp/pull/4557))
+- Wasp now manages your app's URLs in development, so setting `WASP_SERVER_URL`, `WASP_WEB_CLIENT_URL`, or `REACT_APP_API_URL` yourself is now an error. Use the new `--client-url` and `--server-url` options instead (see below). ([#4692](https://github.com/wasp-lang/wasp/pull/4692))
+- Wasp now manages your app's ports in development, so setting them yourself (e.g. `server.port` in `vite.config.ts`) is now an error. ([#4591](https://github.com/wasp-lang/wasp/pull/4591))
+- In deployed Wasp server apps, the `PORT` environment variable is now compulsory. ([#4591](https://github.com/wasp-lang/wasp/pull/4591))
+- Removed the `wasp info` command, in favor of the new `wasp show` family of commands. ([#4622](https://github.com/wasp-lang/wasp/pull/4622))
+- The Wasp server's liveness check moved from `GET /` to `GET /up`. The root path is free for custom `api`s, while `/up` is now reserved by Wasp. Point health checks that probed `/` at `/up`. ([#4856](https://github.com/wasp-lang/wasp/pull/4856))
+
+### 🎉 New Features
+
+- `wasp start` and `wasp build start` now accept `--client-port <port>` and `--server-port <port>` arguments to choose the ports your app runs on. ([#4585](https://github.com/wasp-lang/wasp/pull/4585))
+- `wasp start` will also intelligently choose ports, so that you can run multiple apps in your system simultaneously. ([#4586](https://github.com/wasp-lang/wasp/pull/4586))
+- `wasp start` and `wasp build start` now accept `--client-url <url>` and `--server-url <url>` to make your app reachable at a URL other than `localhost`, such as a LAN hostname or an HTTPS tunnel. ([#4915](https://github.com/wasp-lang/wasp/pull/4915))
+- You can now run dev databases for multiple Wasp projects in parallel: `wasp start db` looks for a first port instead of failing when the default one is taken, and `wasp start` automatically finds the port the database ended up on. ([#4571](https://github.com/wasp-lang/wasp/pull/4571))
+- `wasp start db` now accepts a `--db-port <port>` argument to choose the port your dev database runs on (by @Nihal-Ahamed-MS). ([#4424](https://github.com/wasp-lang/wasp/issues/4424))
+- Wasp now pins newly created Fly.io and Railway databases to PostgreSQL 18. Added `--db-volume-mount-path` to `wasp deploy railway launch` and `wasp deploy railway setup` for custom database images that store data elsewhere. ([#4647](https://github.com/wasp-lang/wasp/pull/4647))
+- Added the `--db-vm-memory`, `--db-vm-cpus`, and `--db-vm-cpu-kind` options to `wasp deploy fly launch` and `wasp deploy fly create-db`. ([#4642](https://github.com/wasp-lang/wasp/pull/4642))
+- Now Wasp fails more gracefully when multiple commands are running in the same project. ([#4504](https://github.com/wasp-lang/wasp/pull/4504))
+- Added a `wasp show spec [--json]` command that prints an overview of your app as Wasp sees it: routes, pages, queries, actions, APIs, CRUDs, and jobs. ([#4451](https://github.com/wasp-lang/wasp/pull/4451))
+- Added the `wasp show build [--json]` command to print information about the last build. ([#4625](https://github.com/wasp-lang/wasp/pull/4625))
+- You can now customize your `tsconfig.src.json` more freely: options like `strict`, `target`, and `lib` are no longer locked, `include` and `exclude` allow extra entries, etc. Wasp still requires the options it needs to compile and bundle your project. ([#4772](https://github.com/wasp-lang/wasp/pull/4772))
+- Custom `api`s can now use the `PATCH` and `HEAD` HTTP methods. ([#4852](https://github.com/wasp-lang/wasp/pull/4852), [#4860](https://github.com/wasp-lang/wasp/pull/4860), [#4867](https://github.com/wasp-lang/wasp/pull/4867))
+- `wasp uninstall` now accepts `--force` to skip the confirmation prompt. ([#5003](https://github.com/wasp-lang/wasp/pull/5003))
+
+### 🐞 Bug fixes
+
+- Fixed TypeScript incremental compilation failing to pick up updated types. ([#4885](https://github.com/wasp-lang/wasp/pull/4885))
+- Wasp's compiler now properly escapes user input in the code it generates. ([#4855](https://github.com/wasp-lang/wasp/pull/4855))
+- Fixed a bug that created Railway databases without a persistent volume when using `--db-image`. Existing databases are unchanged. ([#4647](https://github.com/wasp-lang/wasp/pull/4647))
+- Fixed Wasp commands failing with "resource exhausted (Too many open files)" in projects with many files under `src/`. ([#1919](https://github.com/wasp-lang/wasp/issues/1919))
+- Fixed `wasp start` and `wasp db` commands hanging in some edge cases. ([#4930](https://github.com/wasp-lang/wasp/pull/4930))
+- Failed OAuth logins now tell users when they cancelled the login or it expired, instead of showing an unknown error. ([#4941](https://github.com/wasp-lang/wasp/pull/4941))
+- If an optimistic update’s `getQuerySpecifier` throws, `useAction` now rejects with that error instead of an unrelated `TypeError`. ([#5024](https://github.com/wasp-lang/wasp/pull/5024))
+
+### 🔧 Small improvements
+
+- `wasp start` now finds the managed dev database by asking Docker where the project's database container is running, instead of assuming `localhost:5432`. This means Wasp will no longer accidentally connect to an unrelated database that happens to be listening on port 5432. ([#4567](https://github.com/wasp-lang/wasp/pull/4567))
+- Newly created projects no longer open the browser automatically on `wasp start`. ([#4553](https://github.com/wasp-lang/wasp/pull/4553))
+- Upgraded internal `morgan` to 1.12, which fixes [CVE-2026-5078](https://www.cve.org/CVERecord?id=CVE-2026-5078), [CVE-2026-15603](https://www.cve.org/CVERecord?id=CVE-2026-15603) and [CVE-2026-87859](https://www.cve.org/CVERecord?id=CVE-2026-87859). Wasp's usage was unaffected by the vulnerabilities. ([#4573](https://github.com/wasp-lang/wasp/pull/4573), [#5032](https://github.com/wasp-lang/wasp/pull/5032))
+- The `<region>` argument of `wasp deploy fly` is now case-insensitive, so e.g. `MIA` is accepted instead of being rejected as an invalid region. ([#4588](https://github.com/wasp-lang/wasp/pull/4588))
+- Fixed the throttle on resending the email verification email, which checked when the last password reset email was sent instead of the last verification email. ([#4651](https://github.com/wasp-lang/wasp/pull/4651))
+- Verifying an email now returns an "invalid credentials" error instead of crashing the server when the account behind the verification link no longer exists. ([#4652](https://github.com/wasp-lang/wasp/pull/4652))
+- Resetting a password now logs the account out everywhere, so sessions created before the reset stop working. ([#4653](https://github.com/wasp-lang/wasp/pull/4653))
+- The `OAuthData` type your auth hooks receive now properly includes the `slack` provider. ([#4655](https://github.com/wasp-lang/wasp/pull/4655))
+- Password reset now rejects an invalid or expired token before it looks at the new password, so someone without a valid reset link can no longer probe your app's password rules. ([#4657](https://github.com/wasp-lang/wasp/pull/4657))
+- `onBeforeSignup` now runs before `userSignupFields` on every signup method: email, username and password, and OAuth. ([#4659](https://github.com/wasp-lang/wasp/pull/4659))
+- Improved the wording of some CLI messages. ([#4717](https://github.com/wasp-lang/wasp/pull/4717))
+- Email validation now accepts internationalized addresses such as `jürgen@münchen.de`, accepts addresses typed in uppercase, and no longer accepts a string that merely contains an address somewhere inside it. ([#1392](https://github.com/wasp-lang/wasp/issues/1392))
+- The email verification email now goes to the address Wasp stores (emails are stored lowercased) instead of the address exactly as typed, so it matches where the password reset email is sent. ([#1392](https://github.com/wasp-lang/wasp/issues/1392))
+- Telemetry now also reports the CPU architecture (e.g. `x86_64`, `aarch64`). ([#4918](https://github.com/wasp-lang/wasp/pull/4918))
+- The generated server and the database seed script are now bundled separately. ([#4995](https://github.com/wasp-lang/wasp/pull/4995))
+- `Link` and `NavLink` now accept the same `search` values as `routes.X.build`, including `URLSearchParams`, query strings, and key/value arrays. ([#5029](https://github.com/wasp-lang/wasp/pull/5029))
+- `wasp/client/router` now exports the `LinkProps` and `NavLinkProps` types, so you can build type-safe wrappers around `Link` and `NavLink`. ([#5027](https://github.com/wasp-lang/wasp/pull/5027))
+- When an app uses the Dummy email sender, Wasp's signup and forgot password forms now point to the `wasp start` terminal for the sent emails. ([#5026](https://github.com/wasp-lang/wasp/pull/5026))
+- `wasp db migrate-dev`, `wasp db reset` and `wasp db studio` no longer build the SDK before running. ([#4996](https://github.com/wasp-lang/wasp/pull/4996))
+
+## 0.25.0
+
+### ⚠️ Breaking Changes
+
+Remember to check out the [migration guide](https://wasp.sh/docs/migration-guide) for step-by-step documentation on how to upgrade.
+
+- Upgraded Vite to v8 and Vitest to v4.1. ([#4423](https://github.com/wasp-lang/wasp/pull/4423))
+- Upgraded Wasp's TypeScript support to TypeScript v6. ([#4401](https://github.com/wasp-lang/wasp/pull/4401))
+- Upgraded React Router from v7 to v8. The upgrade is backwards compatible. ([#4433](https://github.com/wasp-lang/wasp/pull/4433))
+- Removed internal `wasp/...` paths that were not part of the documented public API. If your app imported any of these private paths, switch to documented public imports like `wasp/client/operations`, `wasp/server/operations`, `wasp/server/auth`, and `wasp/serialization`. ([#4351](https://github.com/wasp-lang/wasp/pull/4351))
+- Removed the Wasp Language Server functionality, since it's not needed anymore in the Wasp Spec. ([#4335](https://github.com/wasp-lang/wasp/pull/4335))
+
+### 🎉 New Features
+
+- We now have a Linux ARM64 build of Wasp available! That means that Wasp can now run on e.g. the Raspberry Pi or Docker on Apple Silicon. `npm install -g @wasp.sh/wasp-cli` will automatically install the correct version for your system. ([#4435](https://github.com/wasp-lang/wasp/pull/4435))
+- A route's `prerender` option now also accepts an array of paths, so you can prerender specific instances of a dynamic route (e.g. `prerender: ["/blog/intro", "/blog/changelog"]` for a `/blog/:slug` route). ([#4318](https://github.com/wasp-lang/wasp/pull/4318))
+- Added [Resend](https://resend.com) as an email sender provider, usable via `provider: "Resend"` and the `RESEND_API_KEY` environment variable. ([#4381](https://github.com/wasp-lang/wasp/pull/4381))
+- Added a `wasp doctor` command that runs common sanity checks on your setup to check that Wasp can work correctly, and prints a report. ([#4283](https://github.com/wasp-lang/wasp/pull/4283))
+
+### 🐞 Bug fixes
+
+- Fixed a race condition where `useAuth()` could return stale user data after an action that modifies the `User` entity (by @okxint). ([#4343](https://github.com/wasp-lang/wasp/issues/4343))
+
+### 🔧 Small improvements
+
+- The `wasp compile` command is now listed in `wasp`'s usage output and bash completion, making it easier to discover. ([#4456](https://github.com/wasp-lang/wasp/pull/4456))
+- `wasp deps` no longer shows internal Wasp packages in its output (by @okxint). ([#4342](https://github.com/wasp-lang/wasp/issues/4342))
+- `tsconfig.wasp.json`'s `include` now accepts extra globs in addition to the required Wasp entries, so you can keep helpers and libraries used by your `.wasp.ts` files in the same TS project. ([#4398](https://github.com/wasp-lang/wasp/pull/4398))
+- Improved some prerendering internals for a faster first paint and more accurate lazy-loading of pages. ([#4428](https://github.com/wasp-lang/wasp/pull/4428))
+- If you're writing a Wasp Spec library, you can now throw your own `WaspSpecUserError` from `@wasp.sh/spec` to report configuration problems the same way Wasp does. ([#4448](https://github.com/wasp-lang/wasp/pull/4448))
+- The Wasp Spec package now exports the config object types for its constructors from `@wasp.sh/spec`, so libraries built on top of the Spec can reuse the type of a constructor's optional config argument. ([#4447](https://github.com/wasp-lang/wasp/pull/4447))
+- The Wasp Spec package is now published to npm, for easier consumption by libraries outside of Wasp projects. Most users don't need to install it directly, since the Wasp CLI will manage it for you. ([#4461](https://github.com/wasp-lang/wasp/pull/4461))
+- Listing the same entity more than once in a query or action's `entities` now fails with a clear error. ([#4455](https://github.com/wasp-lang/wasp/pull/4455))
+
+## 0.24.0
+
+### ⚠️ Breaking Changes
+
+Remember to check out the [migration guide](https://wasp.sh/docs/migration-guides/migrate-from-0-23-to-0-24) for step-by-step documentation on how to upgrade.
+
+- The Wasp TS config (`main.wasp.ts`) is now called the Wasp Spec, and it should import from `@wasp.sh/spec` instead of `wasp-config`. ([#4153](https://github.com/wasp-lang/wasp/pull/4153))
+- Wasp now requires `vitest` to be listed in your project's `devDependencies`. ([#4182](https://github.com/wasp-lang/wasp/pull/4182))
+- Removed `wasp new:ai` and the `ai-generated` starter template. ([#4280](https://github.com/wasp-lang/wasp/pull/4280))
+
+### 🎉 New Features
+
+- The `api` export from `wasp/client/api` is now a [Ky](https://github.com/sindresorhus/ky) instance instead of Axios for improved performance and smaller final size. ([#3998](https://github.com/wasp-lang/wasp/pull/3998))
+- Wasp TS spec now properly sets the `NODE_ENV` environment variable depending on which command you use to run Wasp. ([#4087](https://github.com/wasp-lang/wasp/pull/4087))
+- Added a type-safe `NavLink` component, mirroring `react-router`'s `NavLink` API (with `isActive`, `isPending`, `isTransitioning` render-prop helpers). ([#4104](https://github.com/wasp-lang/wasp/pull/4104))
+- Wasp TS spec now supports real JS imports, letting you import values in `main.wasp.ts` and pass them directly instead of using import objects like `{ import, from }`. ([#4143](https://github.com/wasp-lang/wasp/pull/4143))
+
+### 🐞 Bug fixes
+
+- Fixed a race condition in development mode that could potentially load the app's JS bundle before the Vite runtime, causing the app to fail the load with a "Can't detect preamble" error. ([#4258](https://github.com/wasp-lang/wasp/issues/4258))
+- Fixed `wasp deploy railway launch` sometimes producing a crashed server with an empty `DATABASE_URL`. Wasp now waits for the database service to finish deploying before setting up the other services. ([#4291](https://github.com/wasp-lang/wasp/pull/4291))
+- Fixed a bug where `wasp deploy railway launch` wouldn't correctly build the Wasp app client if the `/` route was not prerendered. ([#4293](https://github.com/wasp-lang/wasp/pull/4293))
+
+### 🔧 Small improvements
+
+- Wasp now also validates `tsconfig.wasp.json` and the root `tsconfig.json` in TS spec projects, and tsconfig validation errors now mention which `tsconfig.*.json` file caused them. ([#3911](https://github.com/wasp-lang/wasp/pull/3911))
+- The npm package now shows a clear error when installed on an unsupported Node.js version. ([#4268](https://github.com/wasp-lang/wasp/pull/4268))
+
+### 📖 Documentation
+
+- We now have a [SEO & GEO optimization guide](https://wasp.sh/docs/guides/optimization/seo). ([#4264](https://github.com/wasp-lang/wasp/pull/4264))
+
+## 0.23.0
+
+### ⚠️ Breaking Changes
+
+Remember to check out the [migration guide](https://wasp.sh/docs/migration-guides/migrate-from-0-22-to-0-23) for step-by-step documentation on how to upgrade.
+
+- Wasp now requires Node.js >=24.14.1 (previously >=22.22.2). ([#4010](https://github.com/wasp-lang/wasp/pull/4010))
+- Wasp now requires TypeScript version 5.9.3 (previously 5.8.2). ([#4010](https://github.com/wasp-lang/wasp/pull/4010))
+- The HTML file for the final built web app has changed from `index.html` to `200.html`. ([#3981](https://github.com/wasp-lang/wasp/pull/3981))
+
+### 🎉 New Features
+
+- Routes can now be prerendered at build time by setting `prerender: true`. Prerendered routes are served as static HTML for faster load times and better SEO. ([#3982](https://github.com/wasp-lang/wasp/pull/3982))
+
+### 🐞 Bug fixes
+
+- Updated `wasp deploy railway` to work with the Railpack builder. ([#3981](https://github.com/wasp-lang/wasp/pull/3981))
+- Client env validation plugin no longer crashes when the user's client env schema file uses bundler features. ([#4054](https://github.com/wasp-lang/wasp/pull/4054))
+
+- `wasp deploy railway` now correctly configures the client service for SPA routing by providing a custom Caddyfile and pinning the Railpack builder. ([#3981](https://github.com/wasp-lang/wasp/pull/3981))
+
+### 🔧 Small improvements
+
+- Updated our `wasp deploy` tool to support the new `200.html` SPA fallback. ([#3981](https://github.com/wasp-lang/wasp/pull/3981))
+- New Wasp projects now include an `.npmrc` with `min-release-age=7` for supply chain protection. ([#4016](https://github.com/wasp-lang/wasp/pull/4016))
+
+### 📖 Documentation
+
+- Updated deployment guides for Fly.io, Railway, Netlify, and Cloudflare to work with the new `200.html` SPA fallback. ([#3981](https://github.com/wasp-lang/wasp/pull/3981))
+- Added guide for deploying on Render. ([#4055](https://github.com/wasp-lang/wasp/pull/4055))
+
+## 0.22.0
+
+### ⚠️ Breaking Changes
+
+Remember to check out the [migration guide](https://wasp.sh/docs/migration-guides/migrate-from-0-21-to-0-22) for step-by-step documentation on how to upgrade.
+
+- Wasp now requires Node.js version >=v22.22.2 (previously >=v22.12.0) due to the [March 2026 Node.js security releases](https://nodejs.org/en/blog/vulnerability/march-2026-security-releases). ([#3989](https://github.com/wasp-lang/wasp/pull/3989))
+- In the `wasp build` output, the generated Docker image has been upgraded from Alpine 3.20 to Alpine 3.23. ([#3989](https://github.com/wasp-lang/wasp/pull/3989))
+- Upgraded the Zod version used for env validation to Zod v4. If you use custom env validation schemas, you may need to update them to be compatible with the latest Zod API. ([#3879](https://github.com/wasp-lang/wasp/pull/3879))
+- HTML head tags specified in `app.head` must now be valid React JSX. ([#3855](https://github.com/wasp-lang/wasp/pull/3855))
+- Page routes are now loaded lazily by default. You can set `lazy: false` per-route to disable this behavior. ([#3891](https://github.com/wasp-lang/wasp/pull/3891))
+
+### 🎉 New Features
+
+- The Wasp TS config file (`*.wasp.ts`) now supports async logic in the default export, enabling use cases like file-based routing and dynamic configuration. ([#3900](https://github.com/wasp-lang/wasp/pull/3900))
+- Wasp AI (`wasp new:ai`) now accepts any model name string, letting the OpenAI API validate it. The interactive CLI still offers curated GPT-5 options for convenience. ([#3904](https://github.com/wasp-lang/wasp/pull/3904))
+- The `wasp.version` field now accepts any valid npm-compatible version range (e.g. `>=0.15.0 <0.22.0`, `~0.21.0`, `0.21.x`) instead of only `^x.y.z`. ([#3921](https://github.com/wasp-lang/wasp/pull/3921))
+- Page routes are now lazy-loaded using React Router's `lazy` property, greatly reducing the initial download size for apps with many routes. ([#3891](https://github.com/wasp-lang/wasp/pull/3891))
+
+### 🐞 Bug fixes
+
+- `wasp deploy fly` now correctly computes Fly app basenames when the app name contains `-client` or `-server`. ([#3983](https://github.com/wasp-lang/wasp/pull/3983))
+- Projects created with `wasp new` were missing their `.gitignore` file. ([#3870](https://github.com/wasp-lang/wasp/pull/3870))
+
+### 🔧 Small improvements
+
+- The `wasp-config` package is now installed from a local copy inside the project (`.wasp/wasp-config/`) instead of directly from the global Wasp data directory. This makes projects more self-contained and avoids issues with npm resolving paths outside the project. ([#3861](https://github.com/wasp-lang/wasp/pull/3861))
+- `REACT_APP_API_URL` is now **required** when building the client for production (it no longer defaults to any value). In development mode, it still defaults to the local server URL. This prevents silently broken production deployments where the client can't reach the server. ([#3740](https://github.com/wasp-lang/wasp/pull/3740))
+- The `wasp()` Vite plugin now enforces certain Vite config options that Wasp requires (e.g. `base`, `envPrefix`, `build.outDir`) and throws an error if the user tries to override them. ([#3771](https://github.com/wasp-lang/wasp/pull/3771))
+- Upgraded our internal `nodemailer` dependency to v8.0.1 to address [a possible security issue](https://github.com/advisories/GHSA-rcmh-qjqh-p98v). ([#3756](https://github.com/wasp-lang/wasp/pull/3756))
+- In the Vite config, removing the `server.open` field will no longer open the browser on `wasp start`. ([3831](https://github.com/wasp-lang/wasp/pull/3831))
+- Wasp now validates that `vite.config.ts` (or `vite.config.js`) exists in your project at compile time, and warns if it's missing the `wasp` plugin import. ([#3863](https://github.com/wasp-lang/wasp/pull/3863))
+- Wasp now prefixes env validation errors with the name of the field that failed the validation ([#3876](https://github.com/wasp-lang/wasp/pull/3876))
+- Wasp now validates your `tsconfig.json` before analyzing the rest of the code. If something is off, you'll get a clear error message as soon as possible ([#3907](https://github.com/wasp-lang/wasp/issues/3907))
+- Wasp now properly uses ANSI formatting in env validation errors ([#3877](https://github.com/wasp-lang/wasp/pull/3877))
+
+## 0.21.1
+
+### 🐞 Bug fixes
+
+- The new Microsoft auth provider was not exposed in the Wasp TypeScript Config. ([#3762](https://github.com/wasp-lang/wasp/pull/3762))
+
+## 0.21.0
+
+### ⚠️ Breaking Changes
+
+Remember to check out the [migration guide](https://wasp.sh/docs/migration-guides/migrate-from-0-20-to-0-21) for step-by-step documentation on how to upgrade.
+
+- Wasp now requires the `wasp()` plugin in your `vite.config.ts` file. You can import the plugin from `wasp/client/vite` and add it as the first plugin in your Vite configuration. ([#3652](https://github.com/wasp-lang/wasp/pull/3652))
+- User projects must now provide their own `public/manifest.json` file. This file is no longer auto-generated by Wasp. ([#3652](https://github.com/wasp-lang/wasp/pull/3652))
+- Wasp no longer provides Tailwind CSS dependencies automatically. You must install them yourself. ([#3571](https://github.com/wasp-lang/wasp/pull/3571))
+- Wasp now uses **Vitest 4** for testing. ([#3580](https://github.com/wasp-lang/wasp/pull/3580))
+- Removed the `.wasp/build` directory. Wasp now only uses `.wasp/out` for generated code, both in development and production mode. ([#3540](https://github.com/wasp-lang/wasp/pull/3540))
+- The Wasp SDK is now used as a workspace instead of a dependency. This avoids dependency resolution issues and further improves reliability of Wasp projects. ([#3544](https://github.com/wasp-lang/wasp/pull/3544))
+- Wasp now uses **React Router 7**. The package has been renamed from `react-router-dom` to `react-router`, so you'll need to update your imports. ([#3490](https://github.com/wasp-lang/wasp/pull/3490), [#3658](https://github.com/wasp-lang/wasp/pull/3658))
+- Wasp no longer generates `netlify.toml` in the `.wasp/out/web-app` dir. If you're deploying to Netlify, you'll need to add it manually. ([#3665](https://github.com/wasp-lang/wasp/pull/3665))
+- If you are manually deploying the client app, you now build it with `npx vite build` from the project root instead of running `npm run build` inside `.wasp/out/web-app`. The build output is still in `.wasp/out/web-app/build`. ([#3652](https://github.com/wasp-lang/wasp/pull/3652))
+- The `REACT_APP_API_URL` environment variable is no longer supported for specifying a custom server URL during deployment. Use the new `--custom-server-url` CLI option instead. ([#3674](https://github.com/wasp-lang/wasp/pull/3674))
+
+### 🎉 New Features
+
+- **User-land Vite configuration**: Wasp runs Vite in your project root and no longer in `.wasp/out/web-app` dir. Your `vite.config.ts` is the source of truth for Vite configuration. ([#3652](https://github.com/wasp-lang/wasp/pull/3652))
+- The `wasp()` plugin accepts options to customize the underlying `@vitejs/plugin-react` behavior. ([#3652](https://github.com/wasp-lang/wasp/pull/3652))
+- Wasp apps can now offer login with Microsoft (both consumer and Entra accounts) (by @Pipboyguy). ([#3637](https://github.com/wasp-lang/wasp/pull/3637))
+- Wasp can now be installed through `npm`. ([#3525](https://github.com/wasp-lang/wasp/pull/3525))
+- Wasp now supports Tailwind CSS v4. ([#3571](https://github.com/wasp-lang/wasp/pull/3571))
+- Wasp now allows you to override built-in dependencies (advanced, best-effort support only). ([#3643](https://github.com/wasp-lang/wasp/pull/3643))
+
+### 🐞 Bug fixes
+
+- Fixed an issue where if Wasp was installed from npm, `wasp new` would not work correctly. ([#3585](https://github.com/wasp-lang/wasp/pull/3585))
+- Fixed an issue where the `Link` component might not update with the values of `search` and `hash` (by @Pipboyguy). ([#3633](https://github.com/wasp-lang/wasp/pull/3633))
+- We now support Railway CLI v4.18.1 and greater on `wasp deploy railway`. ([#3667](https://github.com/wasp-lang/wasp/pull/3667))
+- Wasp TS spec now validates declaration names. ([#3721](https://github.com/wasp-lang/wasp/pull/3721))
+- Fixed Railway deployment failing when the project name contains special characters (e.g., `kitchen-sink-0.20.0`). ([#3673](https://github.com/wasp-lang/wasp/pull/3673))
+
+### 📖 Documentation
+
+- Upgraded the installation instructions throughout the docs to the new npm installation method. ([#3630](https://github.com/wasp-lang/wasp/pull/3630))
+- The Wasp docs now include a "Guides" section, with step-by-step tutorials on how to use popular libraries and tools with Wasp. Check them out at https://wasp.sh/docs/guides! ([#3597](https://github.com/wasp-lang/wasp/pull/3597))
+
+### 🔧 Small improvements
+
+- We've unlinked Wasp from any specific Tailwind CSS version, so in the future you can adopt new Tailwind CSS versions at your own pace, independently of Wasp. ([#3571](https://github.com/wasp-lang/wasp/pull/3571))
+- `wasp new` now shows a helpful message when the specified template has not been updated to the latest Wasp version. ([#3511](https://github.com/wasp-lang/wasp/pull/3511))
+- Running a Wasp in development or production mode won't modify your `package-lock.json` file anymore. ([#3540](https://github.com/wasp-lang/wasp/pull/3540))
+- We updated the `basic` starter template to the latest best practices for React 19 + TypeScript apps. This applies to new projects created with `wasp new -t basic`, and older projects are unaffected. ([#3572](https://github.com/wasp-lang/wasp/pull/3572))
+- We updated the testing environment to JSDOM 27 for more up-to-date mocking. ([#3580](https://github.com/wasp-lang/wasp/pull/3580))
+- We updated our API mocking to MSW 2 for better performance and reliability. ([#3580](https://github.com/wasp-lang/wasp/pull/3580))
+- `wasp info` now tells you if the last compilation was done in development or production mode. ([#3612](https://github.com/wasp-lang/wasp/pull/3612))
+- `wasp uninstall` now supports the npm installation method. ([#3620](https://github.com/wasp-lang/wasp/pull/3620))
+- Added anonymous usage analytics to the npm package installer to help us understand how Wasp is being installed. You can disable this by setting `WASP_TELEMETRY_DISABLE=1`. ([#3619](https://github.com/wasp-lang/wasp/pull/3619))
+- Improved error messages when using dependencies that are incompatible with internal Wasp dependencies. ([#3655](https://github.com/wasp-lang/wasp/pull/3655))
+- Removed a Rollup version override, since the upstream Rollup issue has been fixed. ([#3654](https://github.com/wasp-lang/wasp/pull/3654))
+- The dev compiler file watcher now ignores `.DS_Store` files, preventing unnecessary recompilations on macOS. ([#3734](https://github.com/wasp-lang/wasp/pull/3734))
+- Added guardrails to avoid installing Wasp through the installer or npm methods when the other method is already being used. ([#3711](https://github.com/wasp-lang/wasp/pull/3711))
+
+## 0.20.2
+
+### 🐞 Bug fixes
+
+- Backported npm migration guardrails to 0.20.2 to prevent users to have both installer- and npm-based versions of Wasp at the same time. ([#3743](https://github.com/wasp-lang/wasp/pull/3743))
+
+## 0.20.1
+
+### 🎉 New Features
+
+- `wasp news` - A new command you can use to stay up to date with the latest Wasp announcements and releases directly from your terminal. Wasp also periodically notifies you of important news (such as security vulnerabilities) during `wasp start`. You can disable this behavior by setting `WASP_AUTO_NEWS_DISABLE=1`. ([#3549](https://github.com/wasp-lang/wasp/pull/3549)).
+
+## 0.20.0
+
+### ⚠️ Breaking Changes
+
+Remember to check out the [migration guide](https://wasp.sh/docs/migration-guides/migrate-from-0-19-to-0-20) for step-by-step documentation on how to upgrade.
+
+- Wasp now uses **React 19**! ([#3489](https://github.com/wasp-lang/wasp/pull/3489))
+  - Check the following upgrade guide to see how to update your code: https://react.dev/blog/2024/04/25/react-19-upgrade-guide.
+  - For Wasp-related updates, check the migration guide above.
+
+### 🎉 New Features
+
+- You can now use the `--force` flag with `wasp db reset` to run the database reset non-interactively ([#3480](https://github.com/wasp-lang/wasp/pull/3480))
+
+### 🐞 Bug fixes
+
+- Fixed `onAfterEmailVerified` hook being called twice while in development mode. ([#3458](https://github.com/wasp-lang/wasp/pull/3458))
+
+### 🔧 Small improvements
+
+- Wasp returns a proper exit code when `wasp db seed` and `wasp db reset` fail. ([#3414](https://github.com/wasp-lang/wasp/pull/3414))
+- Wasp now reports better errors for invalid `package.json` or `tsconfig.json` files. ([#3262](https://github.com/wasp-lang/wasp/pull/3262))
+- Wasp returns a proper exit code when using the `-h,--help` flag with `wasp build start`, `wasp start db`, and `wasp new`. ([#3440](https://github.com/wasp-lang/wasp/pull/3440))
+
+## 0.19.1
+
+### 🐞 Bug fixes
+
+- Fixed logic for getting Railway service domains in `wasp deploy railway` with Railway CLI 4.11.2 and greater. ([#3454](https://github.com/wasp-lang/wasp/pull/3454))
+
+### 🔧 Small improvements
+
+- `wasp build start` now shows an error if you forget to specify any environment variables ([#3412](https://github.com/wasp-lang/wasp/pull/3412))
+
+## 0.19.0
+
+### ⚠️ Breaking Changes
+
+Remember to check out the [migration guide](https://wasp.sh/docs/migration-guides/migrate-from-0-18-to-0-19) for step-by-step documentation on how to upgrade.
+
+- Wasp now requires your project's `package.json` to contain `"workspaces": [".wasp/build/*", ".wasp/out/*"]`. ([#3159](https://github.com/wasp-lang/wasp/pull/3159))
+- The type of `config.allowedCORSOrigins` (from `wasp/server`) was changed from `string | string[]` to `(string | RegExp)[]`.
+
+### 🎉 New Features
+
+- Wasp now uses npm workspaces to manage our generated code. This makes our dependency system more reliable, improves install performance and reduces the size of each project on disk. ([#3159](https://github.com/wasp-lang/wasp/pull/3159))
+- You can now specify which PostgreSQL image to use in `wasp start db` with the `--db-image` argument. ([#3182](https://github.com/wasp-lang/wasp/pull/3182))
+- You can now specify a custom volume mount path for the development database with the `--db-volume-mount-path` option in `wasp start db`. ([#3362](https://github.com/wasp-lang/wasp/pull/3362))
+- You can now specify which PostgreSQL image to use in `wasp deploy railway` with the `--db-image` argument. ([#3184](https://github.com/wasp-lang/wasp/pull/3184))
+- You can now specify which PostgreSQL image to use in `wasp deploy fly` with the `--db-image` argument. ([#3187](https://github.com/wasp-lang/wasp/pull/3187))
+- It's now simpler to extend our default CORS rules. ([#3339](https://github.com/wasp-lang/wasp/pull/3339))
+
+### 🐞 Bug fixes
+
+- Fixed a type error in the generated server app when `process.env.NODE_ENV` is also declared by another dependency in the project. ([#3189](https://github.com/wasp-lang/wasp/pull/3189))
+- Fixed an incompatibility between `wasp deploy fly` and Fly CLI v0.3.214. ([#3372](https://github.com/wasp-lang/wasp/pull/3372))
+- Raised the internal requirement of Tailwind CSS from `^3.2.7` to `^3.4.17` to ensure compatibility with ESM config files. ([#3380](https://github.com/wasp-lang/wasp/issues/3380))
+- Fixed an error with routing when serving the client from a subpath in a domain. ([#3322](https://github.com/wasp-lang/wasp/pull/3322))
+- Fixed an error with CORS when serving the client from a subpath in a domain. ([#3339](https://github.com/wasp-lang/wasp/pull/3339))
+
+### 🔧 Small improvements
+
+- Creating a new OpenSaaS project is now much faster (around 20x faster in our testing!). ([#3196](https://github.com/wasp-lang/wasp/pull/3196))
+- In development mode, Wasp displays a helpful message when navigating to the backend port, pointing you to your app's main URL. ([#3213](https://github.com/wasp-lang/wasp/pull/3213))
+
+### 📖 Documentation
+
+- Updated Tailwind CSS installation command in docs from exact version `3.2.7` to `3` (latest v3) to ensure compatibility with Wasp 0.18.0+ ESM config files. ([#3377](https://github.com/wasp-lang/wasp/issues/3377))
+- Added note for SMTP ports being blocked by some hosting providers (by @Vickram-T-G). ([#3109](https://github.com/wasp-lang/wasp/pull/3109))
+- Added documentation on how to setup the Chrome DevTools workspace mapping with Wasp (by @0xTaneja). ([#3103](https://github.com/wasp-lang/wasp/pull/3103))
+- Updated GitHub social login docs to use GitHub apps over OAuth apps per GitHub recommendation. ([#3277](https://github.com/wasp-lang/wasp/issues/3277))
+
+### 🧩 Other changes
+
+- Wasp's `kitchen-sink` application has been moved to the public examples (`examples/`) directory in our repo. ([#3085](https://github.com/wasp-lang/wasp/pull/3197))
+
+## 0.18.2
+
+### 🐞 Bug fixes
+
+- Wasp dev database (`wasp start db`) now uses a pinned PostgreSQL version (`postgres:18`) with the correct volume mount path. ([#3323](https://github.com/wasp-lang/wasp/pull/3323))
+
+## 0.18.1
+
+### 🐞 Bug fixes
+
+- Wasp now pins `@tanstack/react-query` to a patch version instead of a minor version to prevent future package releases from affecting Wasp. ([#3264](https://github.com/wasp-lang/wasp/pull/3264))
+
+## 0.18.0
+
+### ⚠️ Breaking Changes
+
+- Wasp now requires Node.js version to be >=v22.12. [#2915](https://github.com/wasp-lang/wasp/pull/2915)
+- Wasp now uses ECMAScript Modules (ESM) instead of CommonJS (CJS) for Tailwind configuration files. ([#2998](https://github.com/wasp-lang/wasp/pull/2998))
+- Wasp now uses Vite 7. [#2914](https://github.com/wasp-lang/wasp/pull/2914)
+- Using Wasp Deploy for Railway now requires Railway CLI version 4.6.3 or greater. ([#3113](https://github.com/wasp-lang/wasp/pull/3113))
+
+### 🎉 New Features
+
+- New command: `wasp build start`. Lets you run your built Wasp app locally, just like in production. If required environment variables are missing, the command will show errors—helping you confirm which env vars you'll need to set in production. [#2796](https://github.com/wasp-lang/wasp/pull/2796)
+
+### 🐞 Bug fixes
+
+- Wasp now correctly parses JSON env variables. ([#2849](https://github.com/wasp-lang/wasp/pull/2849)) by @genyus
+- Bash completion now knows about the `db` command. ([#3100](https://github.com/wasp-lang/wasp/pull/3100))
+- Bash completion no longer loops infinitely. ([#3107](https://github.com/wasp-lang/wasp/pull/3107)) by @Vickram-T-G
+- The `EmailSignupData` type now correctly has the the `email` field istead of the `username` field. ([#3149](https://github.com/wasp-lang/wasp/issues/3149))
+- Wasp now explicitly gives users access to its React Query version. ([#3158](https://github.com/wasp-lang/wasp/pull/3158))
+
+### 🔧 Small improvements
+
+- Support for Prisma schemas annotated with [leading triple-slash documentation comments](https://www.prisma.io/docs/orm/prisma-schema/overview#comments). ([#2949](https://github.com/wasp-lang/wasp/pull/2949))
+- Wasp no longer uses Stitches for Auth UI components, reducing bundle size and improving performance. ([#3034](https://github.com/wasp-lang/wasp/pull/3034))
+- You can now create your project in a specific Railway workspace when using Wasp Deploy with the `--workspace` option. ([#3113](https://github.com/wasp-lang/wasp/pull/3113))
+- Better error message when choosing a template that doesn't exist. ([#2992](https://github.com/wasp-lang/wasp/pull/2992))
+- Bash completion setup is simplified. ([#3100](https://github.com/wasp-lang/wasp/pull/3100))
+- Increased the font size in Auth UI components, preventing automatic zooming on mobile devices. (by @Vickram-T-G) ([#3110](https://github.com/wasp-lang/wasp/pull/3110/files))
+- Wasp now allows more flexibility in versions of React Query. ([#3158](https://github.com/wasp-lang/wasp/pull/3158))
+- Wasp's React Query version was bumped in order to avoid a bug on their side. ([#3158](https://github.com/wasp-lang/wasp/pull/3158))
+
+### 📖 Documentation
+
+- Added code examples on how to disable Wasp's default auth for custom auth actions. ([#3033](https://github.com/wasp-lang/wasp/pull/3033))
+
+## 0.17.1
+
+### 🐞 Bug fixes
+
+- Fixes parsing of `app.client` and `app.server` options in `main.wasp.ts` ([#2999](https://github.com/wasp-lang/wasp/pull/2999))
+
 ## 0.17.0
 
 ### ⚠️ Breaking Changes
@@ -403,7 +813,6 @@ We had to make a couple of breaking changes to reach the new simpler Auth API:
    - After: Use `user.getFirstProviderUserId()` directly on the user object.
 
 5. You don't need to use `findUserIdentity` any more:
-
    - Before: Relied on `findUserIdentity` to check which user identity exists.
    - After: Directly check `user.identities.<provider>` existence.
 
@@ -1919,5 +2328,3 @@ For exact details about new syntax, check https://wasp.sh/docs/language/syntax .
 - Added delay on recompilation to avoid redundant recompiling.
 - Added `onAuthSucceededRedirectTo` field in `app`.
 - and more!
-
-## Unreleased changes

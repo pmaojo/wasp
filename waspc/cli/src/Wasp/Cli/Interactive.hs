@@ -3,9 +3,11 @@
 module Wasp.Cli.Interactive
   ( askForInput,
     askToChoose,
-    askToChoose',
     askForRequiredInput,
+    tryGettingConfirmation,
+    tryGettingConfirmationWithTimeout,
     IsOption (..),
+    ConfirmationError (..),
     Option (..),
   )
 where
@@ -13,11 +15,14 @@ where
 import Control.Applicative ((<|>))
 import Data.Foldable (find)
 import Data.Function ((&))
+import Data.Functor ((<&>))
 import Data.List (intercalate)
 import Data.List.NonEmpty (NonEmpty ((:|)))
 import qualified Data.List.NonEmpty as NE
+import Data.Maybe (fromMaybe)
 import qualified Data.Text as T
-import System.IO (hFlush, stdout)
+import System.IO (hFlush, hIsTerminalDevice, stdin, stdout)
+import System.Timeout (timeout)
 import Text.Read (readMaybe)
 import qualified Wasp.Util.Terminal as Term
 
@@ -64,10 +69,7 @@ instance IsOption (Option o) where
 askForRequiredInput :: String -> IO String
 askForRequiredInput = repeatIfNull . askForInput
 
-askToChoose' :: String -> NonEmpty (Option o) -> IO o
-askToChoose' question options = oValue <$> askToChoose question options
-
-askToChoose :: forall o. IsOption o => String -> NonEmpty o -> IO o
+askToChoose :: forall o. (IsOption o) => String -> NonEmpty o -> IO o
 askToChoose _ (singleOption :| []) = return singleOption
 askToChoose question options = do
   putStrLn $ Term.applyStyles [Term.Bold] question
@@ -91,7 +93,7 @@ askToChoose question options = do
 
     printErrorAndAskAgain :: IO o
     printErrorAndAskAgain = do
-      putStrLn $ Term.applyStyles [Term.Red] "Invalid selection, write the name or the index of the option."
+      putStrLn $ Term.applyStyles [Term.Red] "Invalid selection. Type the name or the index of the option."
       askToChoose question options
 
     showIndexedOptions :: String
@@ -128,7 +130,27 @@ askToChoose question options = do
 askForInput :: String -> IO String
 askForInput question = putStr (Term.applyStyles [Term.Bold] question) >> prompt
 
-repeatIfNull :: Foldable t => IO (t a) -> IO (t a)
+tryGettingConfirmation :: String -> String -> IO (Either ConfirmationError ())
+tryGettingConfirmation message requiredAnswer = do
+  isInteractive <- hIsTerminalDevice stdin
+  if not isInteractive
+    then return $ Left NonInteractiveShell
+    else
+      askForInput message <&> \actualAnswer ->
+        if actualAnswer == requiredAnswer
+          then Right ()
+          else Left $ WrongAnswer actualAnswer
+
+tryGettingConfirmationWithTimeout :: String -> String -> Int -> IO (Either ConfirmationError ())
+tryGettingConfirmationWithTimeout message requiredAnswer timeoutSeconds =
+  timeout timeoutMicroseconds (tryGettingConfirmation message requiredAnswer)
+    <&> fromMaybe (Left Timeout)
+  where
+    timeoutMicroseconds = timeoutSeconds * 10 ^ (6 :: Int)
+
+data ConfirmationError = Timeout | NonInteractiveShell | WrongAnswer String
+
+repeatIfNull :: (Foldable t) => IO (t a) -> IO (t a)
 repeatIfNull action = repeatUntil null "This field cannot be empty." action
 
 repeatUntil :: (a -> Bool) -> String -> IO a -> IO a

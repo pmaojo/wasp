@@ -13,13 +13,13 @@ import qualified Wasp.ExternalConfig.Npm.Dependency as Npm.Dependency
 import qualified Wasp.SemanticVersion as SV
 
 areWebSocketsUsed :: AppSpec -> Bool
-areWebSocketsUsed spec = isJust $ AS.App.webSocket $ snd $ getApp spec
+areWebSocketsUsed spec = isJust $ AS.App.webSocket $ getApp spec
 
 socketIoVersionRange :: SV.Range
-socketIoVersionRange = SV.Range [SV.backwardsCompatibleWith (SV.Version 4 6 1)]
+socketIoVersionRange = [SV.r|^4.6.1|]
 
 socketIoComponentEmitterVersionRange :: SV.Range
-socketIoComponentEmitterVersionRange = SV.Range [SV.backwardsCompatibleWith (SV.Version 4 0 0)]
+socketIoComponentEmitterVersionRange = [SV.r|^4.0.0|]
 
 serverDepsRequiredForWebSockets :: [Npm.Dependency.Dependency]
 serverDepsRequiredForWebSockets =

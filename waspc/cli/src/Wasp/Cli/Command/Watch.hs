@@ -8,7 +8,8 @@ import Control.Concurrent.Async (race)
 import Control.Concurrent.Chan (Chan, newChan, readChan)
 import Control.Concurrent.MVar (tryPutMVar, tryTakeMVar)
 import Control.Monad (unless)
-import Data.List (isSuffixOf)
+import Data.Either (fromLeft)
+import Data.List (isPrefixOf, isSuffixOf)
 import Data.Time.Clock (UTCTime, getCurrentTime)
 import StrongPath (Abs, Dir, Path', (</>))
 import qualified StrongPath as SP
@@ -19,7 +20,7 @@ import Wasp.Cli.Message (cliSendMessage)
 import qualified Wasp.Generator.Common as Wasp.Generator
 import qualified Wasp.Message as Msg
 import Wasp.Project (CompileError, CompileWarning, WaspProjectDir)
-import Wasp.Project.Common (extPublicDirInWaspProjectDir, srcDirInWaspProjectDir)
+import Wasp.Project.Common (srcDirInWaspProjectDir)
 
 -- TODO: Idea: Read .gitignore file, and ignore everything from it. This will then also cover the
 --   .wasp dir, and users can easily add any custom stuff they want ignored. But, we also have to
@@ -27,7 +28,7 @@ import Wasp.Project.Common (extPublicDirInWaspProjectDir, srcDirInWaspProjectDir
 
 -- | Forever listens for any file changes at the very top level of
 -- @waspProjectDir@, and also for any changes at any depth in the
--- @waspProjectDir@/src/ and @WaspProjectDir@/public dirs. If there is a change,
+-- @waspProjectDir@/src/ dir. If there is a change,
 -- compiles Wasp source files in @waspProjectDir@ and regenerates files in
 -- @outDir@. It will defer recompilation until no new change was detected in the
 -- last second. It also takes 'ongoingCompilationResultMVar' MVar, into which it
@@ -35,36 +36,33 @@ import Wasp.Project.Common (extPublicDirInWaspProjectDir, srcDirInWaspProjectDir
 -- happens. If there is already something in the MVar, it will get overwritten.
 watch ::
   Path' Abs (Dir WaspProjectDir) ->
-  Path' Abs (Dir Wasp.Generator.ProjectRootDir) ->
+  Path' Abs (Dir Wasp.Generator.GeneratedAppDir) ->
   MVar ([CompileWarning], [CompileError]) ->
   IO ()
 watch waspProjectDir outDir ongoingCompilationResultMVar = FSN.withManager $ \mgr -> do
   chan <- newChan
   _ <- watchFilesAtTopLevelOfWaspProjectDir mgr chan
   _ <- watchFilesAtAllLevelsOfDirInWaspProjectDir mgr chan srcDirInWaspProjectDir
-  _ <- watchFilesAtAllLevelsOfDirInWaspProjectDir mgr chan extPublicDirInWaspProjectDir
   listenForEvents chan =<< getCurrentTime
   where
     watchFilesAtTopLevelOfWaspProjectDir mgr chan =
       FSN.watchDirChan mgr (SP.fromAbsDir waspProjectDir) eventFilter chan
       where
-        eventFilter :: FSN.Event -> Bool
         eventFilter event =
-          -- TODO: Might be valuable to also filter out files from .gitignore.
-          not (isEditorTmpFile filename)
-            && filename /= "package-lock.json"
+          isWatchedFile filename && filename /= "package-lock.json"
           where
             filename = FP.takeFileName $ FSN.eventPath event
 
     watchFilesAtAllLevelsOfDirInWaspProjectDir mgr chan dirInWaspProjectDir =
       FSN.watchTreeChan mgr (SP.fromAbsDir $ waspProjectDir </> dirInWaspProjectDir) eventFilter chan
       where
-        eventFilter :: FSN.Event -> Bool
-        eventFilter event =
-          -- TODO: Might be valuable to also filter out files from .gitignore.
-          not (isEditorTmpFile filename)
-          where
-            filename = FP.takeFileName $ FSN.eventPath event
+        eventFilter = isWatchedFile . FP.takeFileName . FSN.eventPath
+
+    -- TODO: Might be valuable to also filter out files from .gitignore.
+    isWatchedFile :: String -> Bool
+    isWatchedFile filename =
+      not (isEditorTmpFile filename)
+        && filename /= ".DS_Store"
 
     listenForEvents :: Chan FSN.Event -> UTCTime -> IO ()
     listenForEvents chan lastCompileTime = do
@@ -92,7 +90,7 @@ watch waspProjectDir outDir ongoingCompilationResultMVar = FSN.withManager $ \mg
         >> tryPutMVar ongoingCompilationResultMVar (warnings, errors)
         >> return ()
 
-    -- Blocks until no new events are recieved for a duration of `secondsToDelay`.
+    -- Blocks until no new events are received for a duration of `secondsToDelay`.
     -- Consumes any new events during an active timer window and then restarts wait.
     -- If a stale event comes in during an active timer window, we immediately
     -- return control to the caller.
@@ -116,7 +114,8 @@ watch waspProjectDir outDir ongoingCompilationResultMVar = FSN.withManager $ \mg
     recompile :: IO ([CompileWarning], [CompileError])
     recompile = do
       cliSendMessage $ Msg.Start "Recompiling on file change..."
-      (warnings, errors) <- compileIO waspProjectDir outDir
+      (warnings, appSpecOrErrors) <- compileIO waspProjectDir outDir
+      let errors = fromLeft [] appSpecOrErrors
 
       printCompilationResult (warnings, errors)
       if null errors
@@ -124,9 +123,9 @@ watch waspProjectDir outDir ongoingCompilationResultMVar = FSN.withManager $ \mg
           cliSendMessage $
             Msg.Success "Recompilation on file change succeeded."
         else
-          cliSendMessage $
-            Msg.Failure "Recompilation on file change failed." $
-              show (length errors) ++ " errors found"
+          cliSendMessage
+            $ Msg.Failure "Recompilation on file change failed."
+            $ show (length errors) ++ " errors found"
 
       return (warnings, errors)
 
@@ -135,12 +134,11 @@ watch waspProjectDir outDir ongoingCompilationResultMVar = FSN.withManager $ \mg
     --   so better approach would be probably to use information from .gitignore instead, or
     --   maybe combining the two somehow.
     isEditorTmpFile :: String -> Bool
-    isEditorTmpFile "" = False
     isEditorTmpFile filename =
       or
-        [ take 2 filename == ".#", -- Emacs lock files.
-          head filename == '#' && last filename == '#', -- Emacs auto-save files.
-          last filename == '~', -- Emacs and vim backup files.
-          head filename == '.' && ".swp" `isSuffixOf` filename, -- Vim swp files.
-          head filename == '.' && ".un~" `isSuffixOf` filename -- Vim undo files.
+        [ ".#" `isPrefixOf` filename, -- Emacs lock files.
+          "#" `isPrefixOf` filename && "#" `isSuffixOf` filename, -- Emacs auto-save files.
+          "~" `isSuffixOf` filename, -- Emacs and vim backup files.
+          "." `isPrefixOf` filename && ".swp" `isSuffixOf` filename, -- Vim swp files.
+          "." `isPrefixOf` filename && ".un~" `isSuffixOf` filename -- Vim undo files.
         ]

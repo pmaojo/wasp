@@ -7,12 +7,15 @@ import Wasp.Psl.Ast.Common (Name)
 import Wasp.Psl.Ast.ConfigBlock (Identifier)
 import qualified Wasp.Psl.Ast.ConfigBlock as Psl.ConfigBlock
 import qualified Wasp.Psl.Ast.Model as Psl.Model
+import Wasp.Psl.Ast.WithCtx (WithCtx (WithCtx))
+
+getModelFields :: Psl.Model.Body -> [Psl.Model.Field]
+getModelFields (Psl.Model.Body elements) =
+  [field | WithCtx (Psl.Model.ElementField field) _ <- elements]
 
 findIdField :: Psl.Model.Body -> Maybe Psl.Model.Field
-findIdField (Psl.Model.Body elements) = find isIdField fields
+findIdField body = find isIdField (getModelFields body)
   where
-    fields = [field | (Psl.Model.ElementField field) <- elements]
-
     isIdField :: Psl.Model.Field -> Bool
     isIdField Psl.Model.Field {_attrs = attrs} = any (\attr -> Psl.Attribute._attrName attr == attrNameAssociatedWitIdField) attrs
 
@@ -23,7 +26,7 @@ findIdField (Psl.Model.Body elements) = find isIdField fields
 findIdBlockAttribute :: Psl.Model.Body -> Maybe Psl.Attribute.Attribute
 findIdBlockAttribute (Psl.Model.Body elements) = find isIdBlockAttribute attributes
   where
-    attributes = [attr | (Psl.Model.ElementBlockAttribute attr) <- elements]
+    attributes = [attr | WithCtx (Psl.Model.ElementBlockAttribute attr) _ <- elements]
 
     isIdBlockAttribute :: Psl.Attribute.Attribute -> Bool
     isIdBlockAttribute Psl.Attribute.Attribute {_attrName = attrName} = attrName == idBlockAttributeName

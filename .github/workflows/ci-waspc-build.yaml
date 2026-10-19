@@ -1,0 +1,159 @@
+name: "Build - Wasp CLI binaries"
+
+# We never trigger this workflow directly.
+# We can call it manually (workflow_dispatch) or from other workflows (workflow_call).
+on:
+  workflow_call:
+    inputs:
+      exclude-os:
+        description: >
+          OS to skip building for (`linux` or `macos`). If empty, all builds run.
+        required: false
+        type: string
+        default: ""
+
+    outputs:
+      waspc_version:
+        value: ${{ jobs.build.outputs.waspc_version }}
+        description: "The Wasp version built in this workflow."
+      data_files_list:
+        value: ${{ jobs.build.outputs.data_files_list }}
+        description: "List of data files with per-file SHA-256 hashes."
+
+env:
+  WASP_TELEMETRY_DISABLE: 1
+
+jobs:
+  build:
+    outputs:
+      waspc_version: ${{ steps.set-outputs.outputs.waspc_version }}
+      data_files_list: ${{ steps.data-files.outputs.list }}
+
+    strategy:
+      fail-fast: false
+
+      matrix:
+        # == Why such a big, heterogeneous list? ==
+        # This is a bit of mish-mash of different platforms and architectures,
+        # so we need to build some of these directly in the runners, and some in
+        # containers. Each environment is a different OS and needs different
+        # dependencies.
+        #
+        # When possible, we build inside containers so we are not affected when
+        # GitHub updates the runners or deprecates old ones. When we build inside
+        # containers, the runner is only used to host the container, and all the
+        # steps are run inside the container and not the host (like a Dockerfile).
+        env:
+          - os: linux
+            arch: x86_64
+            runner: ubuntu-latest
+            # We use an old Ubuntu version so we can link to a low `glibc` version.
+            # `glibc` is backwards-compatible but not forwards-compatible, so it
+            # is a good idea to use the oldest version we reasonably can. Otherwise,
+            # the wasp binary would possibly not work on the system using an older
+            # glibc than what it was built with (e.g. an older Ubuntu version).
+            container: ubuntu:20.04
+            static: false
+
+          - os: linux
+            arch: x86_64
+            runner: ubuntu-latest
+            # We pin the `alpine` version to a specific one we have tested,
+            # since newer releases might have different versions of the
+            # libraries we depend on.
+            container: alpine:3.23
+            static: true
+
+          - os: linux
+            arch: aarch64
+            runner: ubuntu-24.04-arm
+            # We use an old Ubuntu version so we can link to a low `glibc` version.
+            # `glibc` is backwards-compatible but not forwards-compatible, so it
+            # is a good idea to use the oldest version we reasonably can. Otherwise,
+            # the wasp binary would possibly not work on the system using an older
+            # glibc than what it was built with (e.g. an older Ubuntu version).
+            container: ubuntu:24.04
+            static: false
+
+          - os: macos
+            arch: x86_64
+            runner: macos-15-intel
+            # macOS's syscalls are private and change between versions, so we
+            # can't statically link the binary.
+            static: false
+
+          - os: macos
+            arch: aarch64
+            runner: macos-15 # By default an Apple Silicon-based runner.
+            static: false # Check the comment above for why we can't statically link on macOS
+
+        exclude:
+          - env:
+              os: ${{ inputs.exclude-os }}
+
+    runs-on: ${{ matrix.env.runner }}
+    container:
+      # Zizmor can't follow the matrix to see which container is used so it
+      # marks everything as unpinned, but they _are_ pinned.
+      # zizmor: ignore[unpinned-images]
+      ${{ matrix.env.container }}
+    name: Build Wasp (${{ matrix.env.os }}-${{ matrix.env.arch }}${{ matrix.env.static && '-static' || '' }})
+
+    env:
+      BUILD_NAME: ${{ matrix.env.os }}-${{ matrix.env.arch }}${{ matrix.env.static && '-static' || '' }}
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: $/.github/actions/setup-tools
+        with:
+          haskell: true
+
+      - name: Compute artifact names
+        uses: $/.github/actions/compute-artifact-names
+        id: compute-artifact-names
+        with:
+          build-name: ${{ env.BUILD_NAME }}
+
+      - name: Build and package
+        working-directory: waspc
+        env:
+          LC_ALL: C.UTF-8 # In some Docker containers the LOCALE is not UTF-8 by default
+          BUILD_STATIC: ${{ matrix.env.static && '1' || '' }}
+          TARBALL_NAME: ${{ steps.compute-artifact-names.outputs.tarball-name }}
+        run: |
+          ./run build
+          mkdir -p artifacts
+          ./tools/make_binary_package.sh "artifacts/${TARBALL_NAME}"
+
+      - name: Compute data files list
+        id: data-files
+        working-directory: waspc
+        run: |
+          if command -v sha256sum >/dev/null 2>&1; then
+            HASH_CMD="sha256sum"
+          else
+            HASH_CMD="shasum -a 256"
+          fi
+          {
+            echo 'list<<EOF'
+            cabal sdist --list-only \
+              | grep '^\./data/' \
+              | while IFS= read -r file; do
+                  hash=$($HASH_CMD "$file" | cut -d' ' -f1)
+                  printf '%s\t%s\n' "$file" "$hash"
+                done
+            echo 'EOF'
+          } >> $GITHUB_OUTPUT
+
+      - uses: actions/upload-artifact@v7
+        with:
+          path: ./waspc/artifacts/${{ steps.compute-artifact-names.outputs.tarball-name }}
+          name: ${{ steps.compute-artifact-names.outputs.artifact-name }}
+          if-no-files-found: error
+
+      - name: Set job outputs
+        id: set-outputs
+        run: |
+          echo "waspc_version=$(cd waspc && ./run get-waspc-version)" >> $GITHUB_OUTPUT

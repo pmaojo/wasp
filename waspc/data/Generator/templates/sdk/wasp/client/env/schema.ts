@@ -1,22 +1,46 @@
 {{={= =}=}}
-import * as z from 'zod'
-
+import * as z from "zod"
+import type { FromRegister } from "../../types/register";
 {=# envValidationSchema.isDefined =}
 {=& envValidationSchema.importStatement =}
-const userClientEnvSchema = {= envValidationSchema.importIdentifier =}
+{=/ envValidationSchema.isDefined =}
+
+export type RegisteredClientEnvValidationSchema = FromRegister<"clientEnvValidationSchema", z.ZodObject<{}>>;
+type UserClientEnvSchema = RegisteredClientEnvValidationSchema;
+
+{=# envValidationSchema.isDefined =}
+const userClientEnvSchema: UserClientEnvSchema = {= envValidationSchema.importIdentifier =};
 {=/ envValidationSchema.isDefined =}
 {=^ envValidationSchema.isDefined =}
-const userClientEnvSchema = z.object({})
+const userClientEnvSchema: UserClientEnvSchema = z.object({});
 {=/ envValidationSchema.isDefined =}
 
-const waspClientEnvSchema = z.object({
-  "{= serverUrlEnvVarName =}": z
-  .string()
-  .url({
-    message: '{= serverUrlEnvVarName =} must be a valid URL',
+const serverUrlSchema =
+  z.string({
+    error: '{= serverUrlEnvVarName =} is required',
   })
-  .default('{= defaultServerUrl =}'),
-})
+  .pipe(
+    z.url({
+      error: '{= serverUrlEnvVarName =} must be a valid URL',
+    })
+  )
+
+const waspDevClientEnvSchema = z.object({
+  "{= serverUrlEnvVarName =}": serverUrlSchema,
+});
+
+const waspProdClientEnvSchema = z.object({
+  "{= serverUrlEnvVarName =}": serverUrlSchema,
+});
+
+const waspClientEnvSchema = import.meta.env.MODE === "production"
+  ? waspProdClientEnvSchema
+  : waspDevClientEnvSchema;
+
+export type CompleteClientEnvSchema = z.ZodObject<typeof waspClientEnvSchema["shape"] & UserClientEnvSchema["shape"]>;
 
 // PRIVATE API (sdk, Vite config)
-export const clientEnvSchema = userClientEnvSchema.merge(waspClientEnvSchema)
+export const clientEnvSchema: CompleteClientEnvSchema = z.object({
+  ...userClientEnvSchema.shape,
+  ...waspClientEnvSchema.shape
+});

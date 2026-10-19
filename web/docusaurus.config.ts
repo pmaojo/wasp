@@ -1,13 +1,27 @@
 import type * as Preset from "@docusaurus/preset-classic";
 import type { Config, DocusaurusConfig } from "@docusaurus/types";
 import { themes } from "prism-react-renderer";
+import { getRedirects } from "./redirects";
+import { SKIP_IN_MARKDOWN_DOCS_CLASS } from "./src/lib/constants";
+import { SCRIPT_WITH_CONSENT_TYPE } from "./src/lib/cookie-consent";
+import cloudflareRedirects from "./src/plugins/cloudflare-redirects";
+import { docusaurusPluginLlmFiles } from "./src/plugins/llm-files/docusaurus-plugin";
 import autoImportTabs from "./src/remark/auto-import-tabs";
 import autoJSCode from "./src/remark/auto-js-code";
 import codeWithHole from "./src/remark/code-with-hole";
 import fileExtSwitcher from "./src/remark/file-ext-switcher";
+import fixAPILinks from "./src/remark/fix-api-links";
 import searchAndReplace from "./src/remark/search-and-replace";
 
-const lightCodeTheme = themes.github;
+const lightCodeTheme = {
+  ...themes.github,
+  plain: { ...themes.github.plain, backgroundColor: "var(--wasp-code-bg)" },
+};
+
+const darkCodeTheme = {
+  ...themes.dracula,
+  plain: { ...themes.dracula.plain, backgroundColor: "#1e1e1e" },
+};
 
 const includeCurrentVersion =
   process.env.DOCS_INCLUDE_CURRENT_VERSION === "true";
@@ -26,21 +40,25 @@ const config: Config = {
   trailingSlash: false,
   onBrokenLinks: "throw",
   onBrokenAnchors: "throw",
-  onBrokenMarkdownLinks: "warn",
-  favicon: "img/favicon.ico",
+  favicon: "img/favicon.svg",
   themeConfig: {
+    colorMode: {
+      respectPrefersColorScheme: true,
+    },
+
     announcementBar: {
-      id: "LW7",
+      id: "wasp-100-typescript",
       content:
-        '<b>Have a Wasp app in production?</b> 🐝 <a href="https://e44cy1h4s0q.typeform.com/to/EPJCwsMi">We\'ll send you some swag! 👕</a>',
-      backgroundColor: "#eab307",
-      textColor: "#fff",
+        '<a href="/blog/2026/06/15/wasp-typescript-spec" style="color: inherit; text-decoration: none; display: inline-flex; align-items: center; gap: 12px;"><span style="font-weight: 400; text-transform: uppercase; letter-spacing: 0.1em;">Wasp is now 100% TypeScript</span><span style="display: inline-flex; align-items: center; border: 2px solid #111; background: #F5C842; color: #111; padding: 2px 8px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.15em; font-size: 10px;">Meet TS Spec →</span></a>',
+      backgroundColor: "#3178C6",
+      textColor: "#FAFAFA",
       isCloseable: false,
     },
 
     imageZoom: {
-      // CSS selector to apply the plugin to, defaults to '.markdown img'
-      //selector: '.markdown img',
+      // Opt out any image with the `.no-default-zoom` class (used by our custom
+      // Carousel + ImgGallery components, which have their own lightbox).
+      selector: ".markdown img:not(.no-default-zoom)",
       // Optional medium-zoom options
       // see: https://www.npmjs.com/package/medium-zoom#options
       options: {
@@ -54,19 +72,31 @@ const config: Config = {
       },
     },
     navbar: {
-      title: ".wasp (beta)",
+      title: "Wasp",
       logo: {
         alt: "Wasp logo",
-        src: "img/wasp-logo-eqpar-circle.png",
-        href: "https://wasp.sh/",
-        target: "_self",
+        src: "img/wasp-logo.svg",
+        href: "/",
       },
       items: [
         {
-          type: "docsVersion",
+          type: "docSidebar",
           position: "left",
+          sidebarId: "docs",
           label: "Docs",
           className: "navbar-item-docs navbar-item-outside",
+        },
+        {
+          type: "docSidebar",
+          position: "left",
+          sidebarId: "api",
+          label: "API",
+        },
+        {
+          type: "docSidebar",
+          position: "left",
+          sidebarId: "guides",
+          label: "Guides",
         },
         {
           type: "docsVersionDropdown",
@@ -96,8 +126,15 @@ const config: Config = {
       ],
     },
     prism: {
-      additionalLanguages: ["shell-session", "haskell"],
+      additionalLanguages: [
+        "shell-session",
+        "haskell",
+        "markdown",
+        "diff",
+        "bash",
+      ],
       theme: lightCodeTheme,
+      darkTheme: darkCodeTheme,
     },
     footer: {
       style: "dark",
@@ -166,6 +203,7 @@ const config: Config = {
             fileExtSwitcher,
             searchAndReplace,
             codeWithHole,
+            fixAPILinks,
           ],
 
           // ------ Configuration for multiple docs versions ------ //
@@ -208,12 +246,20 @@ const config: Config = {
           // ------------------------------------------------------ //
         },
         blog: {
+          id: "blog",
+          path: "./blog",
+          routeBasePath: "blog",
+          blogTitle: "Blog",
+          blogDescription:
+            "The latest updates, tutorials, and deep-dives from the Wasp team.",
           showReadingTime: true,
+          showLastUpdateTime: true,
           blogSidebarCount: "ALL",
           blogSidebarTitle: "All our posts",
           postsPerPage: "ALL",
           editUrl: "https://github.com/wasp-lang/wasp/edit/release/web",
-          onUntruncatedBlogPosts: "log",
+          onUntruncatedBlogPosts: "throw",
+          exclude: ["**/CLAUDE.md", "_wasp-intro.md"],
         },
         theme: {
           customCss: ["./src/css/custom.css"],
@@ -224,7 +270,32 @@ const config: Config = {
   scripts: getScripts(),
   plugins: [
     "plugin-image-zoom",
-    async function myPlugin(context, options) {
+
+    cloudflareRedirects({
+      redirects: getRedirects({
+        redirectCurrentVersionToCanonical: !includeCurrentVersion,
+      }),
+    }),
+
+    [
+      "@docusaurus/plugin-content-blog",
+      {
+        id: "resources",
+        path: "./resources",
+        routeBasePath: "resources",
+        blogTitle: "Resources",
+        blogDescription: "Guides, comparisons, and other resources.",
+        authorsMapPath: "../blog/authors.yml",
+        showReadingTime: true,
+        showLastUpdateTime: true,
+        blogSidebarCount: "ALL",
+        blogSidebarTitle: "All resources",
+        postsPerPage: "ALL",
+        editUrl: "https://github.com/wasp-lang/wasp/edit/release/web",
+        onUntruncatedBlogPosts: "throw",
+      },
+    ],
+    async function tailwindPlugin() {
       return {
         name: "docusaurus-tailwindcss",
         configurePostCss(postcssOptions) {
@@ -235,25 +306,98 @@ const config: Config = {
         },
       };
     },
+    [
+      "docusaurus-plugin-typedoc",
+      {
+        // docusaurus-plugin-typedoc options
+        sidebar: { typescript: true },
+
+        // typedoc-plugin-markdown options
+        readme: "none", // Otherwise it will copy the `<repo>/README.md` file to the docs, which we don't want.
+        alwaysCreateEntryPointModule: true, // Otherwise it will put all of the exports of the packages into a single pool instead of per-package.
+
+        // input packages
+        entryPointStrategy: "packages",
+        entryPoints: ["../waspc/data/packages/spec"],
+
+        // If you want to set an option to a specific package, you can create a
+        // `typedoc.jsonc` file in that package's folder with the desired
+        // options from
+        // https://typedoc.org/documents/Options.Package_Options.html.
+      },
+    ],
+    docusaurusPluginLlmFiles({
+      skipElementInMarkdownDocsClass: SKIP_IN_MARKDOWN_DOCS_CLASS,
+    }),
   ],
+  themes: ["@docusaurus/theme-mermaid"],
+  markdown: {
+    mermaid: true,
+    mdx1Compat: {
+      admonitions: true,
+      comments: true,
+      headingIds: true,
+    },
+    hooks: {
+      onBrokenMarkdownLinks: "warn",
+    },
+  },
+  future: {
+    v4: true,
+  },
+};
+
+type DocusaurusScript = DocusaurusConfig["scripts"][number];
+type ScriptWithConsent = Exclude<DocusaurusScript, string> & {
+  requiresConsent: boolean;
 };
 
 function getScripts() {
-  const scripts: DocusaurusConfig["scripts"] = [
-    "/scripts/posthog.js",
-    "/js/fix-multiple-trailing-slashes.js",
+  const sharedScripts: ScriptWithConsent[] = [
+    {
+      src: "/js/fix-multiple-trailing-slashes.js",
+      requiresConsent: false,
+    },
   ];
 
-  if (isProduction) {
-    // Using Cloudflare Workers to proxy the analytics script
-    scripts.push({
+  const devOnlyScripts: ScriptWithConsent[] = [];
+
+  const prodOnlyScripts: ScriptWithConsent[] = [
+    {
+      // We are using Cloudflare Workers to proxy the Plausible script.
       src: "/waspara/wasp/script.js",
       defer: true,
       "data-domain": "wasp.sh",
       "data-api": "/waspara/wasp/event",
-    });
-  }
-  return scripts;
+      // Plausible doesn't use cookies, so it can be loaded right away.
+      requiresConsent: false,
+    },
+    {
+      src: "/scripts/posthog.js",
+      defer: true,
+      requiresConsent: true,
+    },
+  ];
+
+  const scripts = [
+    ...sharedScripts,
+    ...(isProduction ? prodOnlyScripts : devOnlyScripts),
+  ];
+
+  return mapToDocusaurusScripts(scripts);
+}
+
+function mapToDocusaurusScripts(
+  scripts: ScriptWithConsent[],
+): DocusaurusScript[] {
+  return scripts.map(({ requiresConsent, ...rest }) => ({
+    ...rest,
+    // Scripts requiring consent shouldn't be loaded until the cookies are accepted,
+    // so we use a custom type on the script _not to load it_ automatically.
+    // Later, if cookies are accepted, the script will be loaded by the
+    // `src/components/CookieConsentBanner.tsx` component.
+    ...(requiresConsent ? { type: SCRIPT_WITH_CONSENT_TYPE } : {}),
+  }));
 }
 
 export default config;

@@ -16,14 +16,16 @@ module Wasp.AppSpec.App.Auth
     isGoogleAuthEnabled,
     isKeycloakAuthEnabled,
     isGitHubAuthEnabled,
+    isMicrosoftAuthEnabled,
     isEmailAuthEnabled,
+    enabledAuthMethodNames,
     userSignupFieldsForEmailAuth,
     userSignupFieldsForUsernameAuth,
     userSignupFieldsForExternalAuth,
   )
 where
 
-import Data.Aeson (FromJSON)
+import Data.Aeson (FromJSON, ToJSON)
 import Data.Data (Data)
 import Data.Maybe (isJust)
 import GHC.Generics (Generic)
@@ -36,7 +38,6 @@ import Wasp.AppSpec.ExtImport (ExtImport)
 
 data Auth = Auth
   { userEntity :: Ref Entity,
-    externalAuthEntity :: Maybe (Ref Entity),
     methods :: AuthMethods,
     onAuthFailedRedirectTo :: String,
     onAuthSucceededRedirectTo :: Maybe String,
@@ -47,7 +48,7 @@ data Auth = Auth
     onBeforeLogin :: Maybe ExtImport,
     onAfterLogin :: Maybe ExtImport
   }
-  deriving (Show, Eq, Data, Generic, FromJSON)
+  deriving (Show, Eq, Data, Generic, FromJSON, ToJSON)
 
 data AuthMethods = AuthMethods
   { usernameAndPassword :: Maybe UsernameAndPasswordConfig,
@@ -56,20 +57,21 @@ data AuthMethods = AuthMethods
     google :: Maybe ExternalAuthConfig,
     gitHub :: Maybe ExternalAuthConfig,
     keycloak :: Maybe ExternalAuthConfig,
+    microsoft :: Maybe ExternalAuthConfig,
     email :: Maybe EmailAuthConfig
   }
-  deriving (Show, Eq, Data, Generic, FromJSON)
+  deriving (Show, Eq, Data, Generic, FromJSON, ToJSON)
 
 data UsernameAndPasswordConfig = UsernameAndPasswordConfig
   { userSignupFields :: Maybe ExtImport
   }
-  deriving (Show, Eq, Data, Generic, FromJSON)
+  deriving (Show, Eq, Data, Generic, FromJSON, ToJSON)
 
 data ExternalAuthConfig = ExternalAuthConfig
   { configFn :: Maybe ExtImport,
     userSignupFields :: Maybe ExtImport
   }
-  deriving (Show, Eq, Data, Generic, FromJSON)
+  deriving (Show, Eq, Data, Generic, FromJSON, ToJSON)
 
 data EmailAuthConfig = EmailAuthConfig
   { userSignupFields :: Maybe ExtImport,
@@ -77,7 +79,7 @@ data EmailAuthConfig = EmailAuthConfig
     emailVerification :: EmailVerificationConfig,
     passwordReset :: PasswordResetConfig
   }
-  deriving (Show, Eq, Data, Generic, FromJSON)
+  deriving (Show, Eq, Data, Generic, FromJSON, ToJSON)
 
 isUsernameAndPasswordAuthEnabled :: Auth -> Bool
 isUsernameAndPasswordAuthEnabled = isJust . usernameAndPassword . methods
@@ -91,7 +93,8 @@ isExternalAuthEnabled auth =
       isDiscordAuthEnabled,
       isGoogleAuthEnabled,
       isGitHubAuthEnabled,
-      isKeycloakAuthEnabled
+      isKeycloakAuthEnabled,
+      isMicrosoftAuthEnabled
     ]
 
 isSlackAuthEnabled :: Auth -> Bool
@@ -109,17 +112,38 @@ isKeycloakAuthEnabled = isJust . keycloak . methods
 isGitHubAuthEnabled :: Auth -> Bool
 isGitHubAuthEnabled = isJust . gitHub . methods
 
+isMicrosoftAuthEnabled :: Auth -> Bool
+isMicrosoftAuthEnabled = isJust . microsoft . methods
+
 isEmailAuthEnabled :: Auth -> Bool
 isEmailAuthEnabled = isJust . email . methods
 
+-- | Names of the auth methods enabled in the app, as the user knows them.
+enabledAuthMethodNames :: AuthMethods -> [String]
+enabledAuthMethodNames authMethods =
+  [ methodName
+  | (methodName, isEnabled) <-
+      -- NOTE: Make sure to add new auth methods here.
+      [ ("usernameAndPassword", isJust $ usernameAndPassword authMethods),
+        ("slack", isJust $ slack authMethods),
+        ("discord", isJust $ discord authMethods),
+        ("google", isJust $ google authMethods),
+        ("gitHub", isJust $ gitHub authMethods),
+        ("keycloak", isJust $ keycloak authMethods),
+        ("microsoft", isJust $ microsoft authMethods),
+        ("email", isJust $ email authMethods)
+      ],
+    isEnabled
+  ]
+
 -- These helper functions are used to avoid ambiguity when using the
--- `userSignupFields` function (otherwise we need to use the DuplicateRecordFields
--- extension in each module that uses them).
+-- `userSignupFields` function (otherwise we need to use DuplicateRecordFields
+-- and OverloadedRecordDot extension in each module that uses them).
 userSignupFieldsForEmailAuth :: EmailAuthConfig -> Maybe ExtImport
-userSignupFieldsForEmailAuth = userSignupFields
+userSignupFieldsForEmailAuth = (.userSignupFields)
 
 userSignupFieldsForUsernameAuth :: UsernameAndPasswordConfig -> Maybe ExtImport
-userSignupFieldsForUsernameAuth = userSignupFields
+userSignupFieldsForUsernameAuth = (.userSignupFields)
 
 userSignupFieldsForExternalAuth :: ExternalAuthConfig -> Maybe ExtImport
-userSignupFieldsForExternalAuth = userSignupFields
+userSignupFieldsForExternalAuth = (.userSignupFields)

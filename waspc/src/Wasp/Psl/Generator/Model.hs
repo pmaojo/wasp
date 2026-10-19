@@ -1,23 +1,32 @@
 module Wasp.Psl.Generator.Model
   ( generateModelBody,
+    generateModelFieldTypeAndModifiers,
   )
 where
 
 import qualified Wasp.Psl.Ast.Model as Psl.Model
 import Wasp.Psl.Generator.Attribute (generateAttribute)
 import Wasp.Psl.Generator.Common (PslSource)
+import Wasp.Psl.Generator.WithCtx (generateWithCtx)
 
 generateModelBody :: Psl.Model.Body -> PslSource
-generateModelBody (Psl.Model.Body elements) = unlines $ map (("  " ++) . generateModelElement) elements
+generateModelBody (Psl.Model.Body elements) = unlines $ generateWithCtx generateModelElement <$> elements
 
 generateModelElement :: Psl.Model.Element -> PslSource
 generateModelElement (Psl.Model.ElementField field) =
-  Psl.Model._name field ++ " "
-    ++ generateModelFieldType (Psl.Model._type field)
-    ++ concatMap generateModelFieldTypeModifier (Psl.Model._typeModifiers field)
+  Psl.Model._name field
+    ++ " "
+    ++ generateModelFieldTypeAndModifiers field
     ++ concatMap ((" " ++) . generateAttribute) (Psl.Model._attrs field)
 generateModelElement (Psl.Model.ElementBlockAttribute attribute) =
   "@" ++ generateAttribute attribute
+
+-- | Renders the field's type the way it is written in the Prisma schema,
+-- e.g. "Int", "String?", "Tag[]".
+generateModelFieldTypeAndModifiers :: Psl.Model.Field -> PslSource
+generateModelFieldTypeAndModifiers field =
+  generateModelFieldType (Psl.Model._type field)
+    ++ concatMap generateModelFieldTypeModifier (Psl.Model._typeModifiers field)
 
 generateModelFieldType :: Psl.Model.FieldType -> PslSource
 generateModelFieldType fieldType = case fieldType of

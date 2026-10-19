@@ -1,26 +1,35 @@
 {
   "name": "websockets-realtime-voting",
   "type": "module",
+  "workspaces": [
+    ".wasp/out/*",
+    ".wasp/out/sdk/wasp"
+  ],
   "scripts": {
-    "test": "DEBUG=pw:webserver playwright test --config headless-tests/"
+    "test": "npm run test:install-deps && DEBUG=pw:webserver playwright test --config e2e-tests/",
+    "test:install-deps": "playwright install ${WASP_PLAYWRIGHT_INSTALL_FLAGS---with-deps}"
   },
   "dependencies": {
     "express": "~5.1.0",
-    "flowbite": "1.6.6",
-    "flowbite-react": "0.4.9",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "react-router-dom": "^6.26.2",
-    "wasp": "file:.wasp/out/sdk/wasp"
+    "flowbite": "^4.0.1",
+    "flowbite-react": "^0.12.15",
+    "react": "^19.2.1",
+    "react-dom": "^19.2.1",
+    "react-router": "^8.0.1",
+    "tailwindcss": "^4.1.18"
   },
   "devDependencies": {
-    "@playwright/test": "1.51.1",
+    "@playwright/test": "1.55.1",
+    "@tailwindcss/vite": "^4.3.1",
     "@types/express": "^5.0.0",
-    "@types/react": "^18.0.37",
-    "@wasp.sh/wasp-app-runner": "^0.0.7",
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "@wasp.sh/spec": "file:.wasp/spec",
+    "@wasp.sh/wasp-app-runner": "^0.0.18",
     "prisma": "5.19.1",
-    "tailwindcss": "^3.2.7",
-    "typescript": "5.8.2",
-    "vite": "^4.3.9"
+    "typescript": "6.0.3",
+    "vite": "^8.1.0",
+    "vitest": "^4.1.9"
   }
 }

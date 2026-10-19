@@ -6,7 +6,10 @@
 module Wasp.Generator.ServerGenerator
   ( genServer,
     operationsRouteInRootRouter,
-    npmDepsForWasp,
+    npmDepsFromWasp,
+
+    -- * Exported for testing only
+    genDotEnv,
   )
 where
 
@@ -35,7 +38,6 @@ import Wasp.AppSpec (AppSpec)
 import qualified Wasp.AppSpec as AS
 import qualified Wasp.AppSpec.App as AS.App
 import qualified Wasp.AppSpec.App.Server as AS.App.Server
-import Wasp.AppSpec.ExternalFiles (SourceExternalCodeDir)
 import Wasp.AppSpec.Util (isPgBossJobExecutorUsed)
 import qualified Wasp.AppSpec.Util as AS.Util
 import Wasp.AppSpec.Valid (getApp, getLowestNodeVersionUserAllows, isAuthEnabled)
@@ -43,23 +45,33 @@ import Wasp.Env (envVarsToDotEnvContent)
 import qualified Wasp.ExternalConfig.Npm.Dependency as Npm.Dependency
 import Wasp.Generator.Common (ServerRootDir)
 import qualified Wasp.Generator.Crud.Routes as CrudRoutes
-import Wasp.Generator.DepVersions (superjsonVersion, typescriptVersion)
+import Wasp.Generator.DepVersions
+  ( dotenvVersionRange,
+    expressTypesVersionRange,
+    expressVersionRange,
+    superjsonVersionRange,
+    typescriptVersionRange,
+  )
 import Wasp.Generator.FileDraft (FileDraft, createTextFileDraft)
 import Wasp.Generator.Monad (Generator)
+import Wasp.Generator.NpmDependencies (NpmDepsForPackage (peerDependencies))
 import qualified Wasp.Generator.NpmDependencies as N
+import Wasp.Generator.NpmWorkspaces (serverPackageName)
 import Wasp.Generator.ServerGenerator.ApiRoutesG (genApis)
 import Wasp.Generator.ServerGenerator.AuthG (genAuth)
 import qualified Wasp.Generator.ServerGenerator.Common as C
 import Wasp.Generator.ServerGenerator.CrudG (genCrud)
-import Wasp.Generator.ServerGenerator.Db.Seed (genDbSeed, getDbSeeds, getPackageJsonPrismaSeedField)
-import Wasp.Generator.ServerGenerator.DepVersions (expressTypesVersion, expressVersionStr)
+import Wasp.Generator.ServerGenerator.Db.Seed (genDbSeed, getPackageJsonPrismaSeedField)
 import Wasp.Generator.ServerGenerator.JobGenerator (genJobs)
 import Wasp.Generator.ServerGenerator.JsImport (extImportToImportJson, getAliasedJsImportStmtAndIdentifier)
 import Wasp.Generator.ServerGenerator.OperationsG (genOperations)
 import Wasp.Generator.ServerGenerator.OperationsRoutesG (genOperationsRoutes)
+import Wasp.Generator.ServerGenerator.VirtualUserModulesPluginG (genVirtualUserModulesPlugin)
 import Wasp.Generator.ServerGenerator.WebSocketG (depsRequiredByWebSockets, genWebSockets, mkWebSocketFnImport)
+import Wasp.Generator.WaspLibs.AvailableLibs (waspLibs)
+import qualified Wasp.Generator.WaspLibs.WaspLib as WaspLib
 import qualified Wasp.Node.Version as NodeVersion
-import Wasp.Project.Common (SrcTsConfigFile, srcDirInWaspProjectDir, waspProjectDirFromAppComponentDir)
+import Wasp.Project.Common (SrcTsConfigFile, UserSrcDir, srcDirInWaspProjectDir, waspProjectDirFromGeneratedAppComponentDir)
 import Wasp.Project.Db (databaseUrlEnvVarName)
 import qualified Wasp.SemanticVersion as SV
 import Wasp.Util ((<++>))
@@ -68,13 +80,15 @@ genServer :: AppSpec -> Generator [FileDraft]
 genServer spec =
   sequence
     [ genFileCopy [relfile|README.md|],
-      genRollupConfigJs spec,
+      genFileCopy [relfile|rollup.config.js|],
+      genFileCopy [relfile|src/createRollupBundle.js|],
+      genVirtualUserModulesPlugin spec,
       genTsConfigJson spec,
-      genPackageJson spec (npmDepsForWasp spec),
-      genNpmrc,
+      genPackageJson spec npmDeps,
       genGitignore,
       genNodemon
     ]
+    <++> genNpmrc spec
     <++> genSrcDir spec
     <++> genDotEnv spec
     <++> genJobs spec
@@ -82,21 +96,22 @@ genServer spec =
     <++> genCrud spec
   where
     genFileCopy = return . C.mkTmplFd
+    npmDeps = npmDepsFromWasp spec
 
 genDotEnv :: AppSpec -> Generator [FileDraft]
 -- Don't generate .env if we are building for production, since .env is to be used only for
 -- development.
-genDotEnv spec | AS.isBuild spec = return []
+genDotEnv spec | AS.isProduction spec = return []
 genDotEnv spec =
   return
     [ createTextFileDraft
-        (C.serverRootDirInProjectRootDir </> dotEnvInServerRootDir)
+        (C.serverRootDirInGeneratedAppDir </> dotEnvInServerRootDir)
         (envVarsToDotEnvContent envVars)
     ]
   where
     envVars = waspEnvVars ++ userEnvVars
-    userEnvVars = AS.devEnvVarsServer spec
-    waspEnvVars = case AS.devDatabaseUrl spec of
+    userEnvVars = spec.devEnvVarsServer
+    waspEnvVars = case spec.devDatabaseUrl of
       Just url | not isThereCustomDbUrl -> [(databaseUrlEnvVarName, url)]
       _ -> []
     isThereCustomDbUrl = any ((== databaseUrlEnvVarName) . fst) userEnvVars
@@ -118,19 +133,19 @@ genTsConfigJson spec = do
       )
   where
     srcTsConfigPath :: Path' (Rel C.ServerRootDir) (File SrcTsConfigFile) =
-      waspProjectDirFromAppComponentDir </> AS.srcTsConfigPath spec
+      waspProjectDirFromGeneratedAppComponentDir </> AS.srcTsConfigPath spec
 
-genPackageJson :: AppSpec -> N.NpmDepsForWasp -> Generator FileDraft
-genPackageJson spec waspDependencies = do
-  combinedDependencies <- N.genNpmDepsForPackage spec waspDependencies
+genPackageJson :: AppSpec -> N.NpmDepsFromWasp -> Generator FileDraft
+genPackageJson spec waspDependencies =
   return $
     C.mkTmplFdWithDstAndData
       (C.asTmplFile [relfile|package.json|])
       (C.asServerFile [relfile|package.json|])
       ( Just $
           object
-            [ "depsChunk" .= N.getDependenciesPackageJsonEntry combinedDependencies,
-              "devDepsChunk" .= N.getDevDependenciesPackageJsonEntry combinedDependencies,
+            [ "packageName" .= serverPackageName,
+              "depsChunk" .= N.getDependenciesPackageJsonEntry serverDeps,
+              "devDepsChunk" .= N.getDevDependenciesPackageJsonEntry serverDeps,
               "nodeVersionRange" .= (">=" <> show NodeVersion.oldestWaspSupportedNodeVersion),
               "startProductionScript"
                 .= ( (if hasEntities then "npm run db-migrate-prod && " else "")
@@ -140,6 +155,8 @@ genPackageJson spec waspDependencies = do
             ]
       )
   where
+    serverDeps = N.mergeWaspAndUserDeps waspDependencies $ N.getUserNpmDepsForPackage spec
+
     hasEntities = AS.Util.hasEntities spec
 
 getPackageJsonPrismaField :: AppSpec -> Aeson.Value
@@ -147,46 +164,62 @@ getPackageJsonPrismaField spec = object $ [] <> seedEntry
   where
     seedEntry = maybeToList $ Just . ("seed" .=) =<< getPackageJsonPrismaSeedField spec
 
-npmDepsForWasp :: AppSpec -> N.NpmDepsForWasp
-npmDepsForWasp spec =
-  N.NpmDepsForWasp
-    { N.waspDependencies =
-        Npm.Dependency.fromList
-          [ ("cookie-parser", "~1.4.6"),
-            ("cors", "^2.8.5"),
-            ("express", expressVersionStr),
-            ("morgan", "~1.10.0"),
-            ("dotenv", "^16.0.2"),
-            ("helmet", "^6.0.0"),
-            ("superjson", show superjsonVersion)
-          ]
-          ++ depsRequiredByWebSockets spec,
-      N.waspDevDependencies =
-        Npm.Dependency.fromList
-          [ ("nodemon", "^2.0.19"),
-            -- TODO: Allow users to choose whether they want to use TypeScript
-            -- in their projects and install these dependencies accordingly.
-            ("typescript", show typescriptVersion),
-            ("@types/express", show expressTypesVersion),
-            ("@types/express-serve-static-core", show expressTypesVersion),
-            ("@types/node", "^" <> majorNodeVersionStr <> ".0.0"),
-            ("@tsconfig/node" <> majorNodeVersionStr, "latest"),
-            ("@types/cors", "^2.8.5"),
-            ("rollup", "^4.9.6"),
-            ("rollup-plugin-esbuild", "^6.1.1"),
-            ("@rollup/plugin-node-resolve", "^16.0.0")
-          ]
-    }
+npmDepsFromWasp :: AppSpec -> N.NpmDepsFromWasp
+npmDepsFromWasp spec =
+  N.NpmDepsFromWasp $
+    N.NpmDepsForPackage
+      { N.dependencies =
+          Npm.Dependency.fromList
+            [ ("cookie-parser", "~1.4.6"),
+              ("cors", "^2.8.5"),
+              ("express", show expressVersionRange),
+              ("morgan", "~1.12.1"),
+              ("dotenv", show dotenvVersionRange),
+              ("helmet", "^6.0.0"),
+              ("superjson", show superjsonVersionRange)
+            ]
+            ++ depsRequiredByWebSockets spec
+            ++ waspLibsNpmDeps,
+        N.devDependencies =
+          Npm.Dependency.fromList
+            [ ("nodemon", "^2.0.19"),
+              -- TODO: Allow users to choose whether they want to use TypeScript
+              -- in their projects and install these dependencies accordingly.
+              ("typescript", show typescriptVersionRange),
+              ("@types/express", show expressTypesVersionRange),
+              ("@types/express-serve-static-core", show expressTypesVersionRange),
+              ("@types/node", show $ NodeVersion.nodeTypesVersionRangeMatchingNodeMajor $ getLowestNodeVersionUserAllows spec),
+              ("@tsconfig/node" <> majorNodeVersionStr, "latest"),
+              ("@types/cors", "^2.8.5"),
+              ("rollup", "^4.9.6"),
+              ("rollup-plugin-esbuild", "^6.1.1"),
+              ("@rollup/plugin-node-resolve", "^16.0.0")
+            ],
+        peerDependencies = []
+      }
   where
     majorNodeVersionStr = show (SV.major $ getLowestNodeVersionUserAllows spec)
 
-genNpmrc :: Generator FileDraft
-genNpmrc =
-  return $
-    C.mkTmplFdWithDstAndData
-      (C.asTmplFile [relfile|npmrc|])
-      (C.asServerFile [relfile|.npmrc|])
-      Nothing
+    waspLibsNpmDeps = map (WaspLib.makeLocalNpmDepFromWaspLib C.libsRootDirFromServerDir) waspLibs
+
+genNpmrc :: AppSpec -> Generator [FileDraft]
+genNpmrc spec
+  -- We only use `.npmrc` to force `npm` to error out if the Node.js version is incompatible.
+  --
+  -- In dev mode, we already check the Node.js version ourselves before running any `npm` commands,
+  -- so we don't need this there.
+  --
+  -- We do expect users to manually go into the generated directories when bundling the built ouput.
+  -- So we do add the `.npmrc` there to help them avoid using an incompatible Node.js version.
+  | AS.isProduction spec =
+      return
+        [ C.mkTmplFdWithDstAndData
+            (C.asTmplFile [relfile|npmrc|])
+            (C.asServerFile [relfile|.npmrc|])
+            Nothing
+        ]
+  | otherwise =
+      return []
 
 genGitignore :: Generator FileDraft
 genGitignore =
@@ -203,8 +236,8 @@ genNodemon =
       [relfile|nodemon.json|]
       (Just $ object ["relativeUserSrcDirPath" .= fromRelDir relativeUserSrcDirPath])
   where
-    relativeUserSrcDirPath :: Path' (Rel C.ServerRootDir) (Dir SourceExternalCodeDir) =
-      waspProjectDirFromAppComponentDir </> srcDirInWaspProjectDir
+    relativeUserSrcDirPath :: Path' (Rel C.ServerRootDir) (Dir UserSrcDir) =
+      waspProjectDirFromGeneratedAppComponentDir </> srcDirInWaspProjectDir
 
 genSrcDir :: AppSpec -> Generator [FileDraft]
 genSrcDir spec =
@@ -213,6 +246,7 @@ genSrcDir spec =
       genServerJs spec
     ]
     <++> genRoutesDir spec
+    <++> genViewsDir spec
     <++> genOperationsRoutes spec
     <++> genOperations spec
     <++> genAuth spec
@@ -236,8 +270,8 @@ genServerJs spec =
             ]
       )
   where
-    maybeSetupJsFunction = AS.App.Server.setupFn =<< AS.App.server (snd $ getApp spec)
-    maybeWebSocket = AS.App.webSocket $ snd $ getApp spec
+    maybeSetupJsFunction = AS.App.Server.setupFn =<< AS.App.server (getApp spec)
+    maybeWebSocket = AS.App.webSocket $ getApp spec
 
     relPathToServerSrcDir :: Path Posix (Rel importLocation) (Dir C.ServerSrcDir)
     relPathToServerSrcDir = [reldirP|./|]
@@ -260,13 +294,35 @@ genRoutesIndex spec =
       object
         [ "operationsRouteInRootRouter" .= (operationsRouteInRootRouter :: String),
           "crudRouteInRootRouter" .= (CrudRoutes.crudRouteInRootRouter :: String),
+          "upRouteInRootRouter" .= (upRouteInRootRouter :: String),
           "isAuthEnabled" .= (isAuthEnabled spec :: Bool),
           "areThereAnyCustomApiRoutes" .= (not . null $ AS.getApis spec),
-          "areThereAnyCrudRoutes" .= (not . null $ AS.getCruds spec)
+          "areThereAnyCrudRoutes" .= (not . null $ AS.getCruds spec),
+          "isDevelopment" .= (AS.isDevelopment spec :: Bool),
+          "appName" .= (app.name :: String)
         ]
+    app = getApp spec
 
 operationsRouteInRootRouter :: String
 operationsRouteInRootRouter = "operations"
+
+-- | Since our health check is just a simple liveness check,
+-- we use the same @/up@ route that Rails and Laravel use.
+--
+-- Health checks (@/health@ route) are much more complex,
+-- so we let users handle it themselves.
+upRouteInRootRouter :: String
+upRouteInRootRouter = "up"
+
+genViewsDir :: AppSpec -> Generator [FileDraft]
+genViewsDir spec
+  | AS.isProduction spec = return []
+  | otherwise =
+      sequence
+        [ genFileCopy [relfile|views/wrong-port.ts|]
+        ]
+  where
+    genFileCopy = return . C.mkSrcTmplFd
 
 genMiddleware :: AppSpec -> Generator [FileDraft]
 genMiddleware spec =
@@ -283,7 +339,7 @@ genMiddleware spec =
 
     globalMiddlewareConfigFnTmplData :: Aeson.Value
     globalMiddlewareConfigFnTmplData =
-      let maybeGlobalMiddlewareConfigFn = AS.App.server (snd $ getApp spec) >>= AS.App.Server.middlewareConfigFn
+      let maybeGlobalMiddlewareConfigFn = AS.App.server (getApp spec) >>= AS.App.Server.middlewareConfigFn
           globalMiddlewareConfigFnAlias = "_waspGlobalMiddlewareConfigFn"
           maybeGlobalMidlewareConfigFnImports = getAliasedJsImportStmtAndIdentifier globalMiddlewareConfigFnAlias [reldirP|../|] <$> maybeGlobalMiddlewareConfigFn
        in object
@@ -301,12 +357,3 @@ genOperationsMiddleware spec =
       (Just tmplData)
   where
     tmplData = object ["isAuthEnabled" .= (isAuthEnabled spec :: Bool)]
-
-genRollupConfigJs :: AppSpec -> Generator FileDraft
-genRollupConfigJs spec =
-  return $
-    C.mkTmplFdWithData [relfile|rollup.config.js|] (Just tmplData)
-  where
-    tmplData = object ["areDbSeedsDefined" .= areDbSeedsDefined]
-
-    areDbSeedsDefined = maybe False (not . null) $ getDbSeeds spec

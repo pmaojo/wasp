@@ -1,4 +1,5 @@
 import { stripVTControlCharacters } from "node:util";
+import semver, { type SemVer } from "semver";
 
 import type { PathToApp, WaspCliCmd } from "./args.js";
 import { DbType } from "./db/index.js";
@@ -7,6 +8,7 @@ import { spawnAndCollectOutput, spawnWithLog } from "./process.js";
 import type { Branded, EnvVars } from "./types.js";
 
 export type AppName = Branded<string, "AppName">;
+export type WaspVersion = Branded<SemVer, "WaspVersion">;
 
 export function waspMigrateDb({
   waspCliCmd,
@@ -19,7 +21,7 @@ export function waspMigrateDb({
 }): Promise<{ exitCode: number | null }> {
   return spawnWithLog({
     name: "wasp-migrate-db",
-    cmd: waspCliCmd,
+    cmd: waspCliCmd.cmd,
     /**
      * We use the --name flag because sometimes we run apps without a migrations directory,
      * which causes Prisma to prompt for a migration name interactively. This would make
@@ -27,7 +29,7 @@ export function waspMigrateDb({
      * Prisma timestamps all migration filenames automatically.
      * See: https://github.com/wasp-lang/runner-action/issues/7
      */
-    args: ["db", "migrate-dev", "--name", "auto-migration"],
+    args: [...waspCliCmd.args, "db", "migrate-dev", "--name", "auto-migration"],
     cwd: pathToApp,
     extraEnv,
   });
@@ -44,8 +46,8 @@ export function waspStart({
 }): Promise<{ exitCode: number | null }> {
   return spawnWithLog({
     name: "wasp-start",
-    cmd: waspCliCmd,
-    args: ["start"],
+    cmd: waspCliCmd.cmd,
+    args: [...waspCliCmd.args, "start"],
     cwd: pathToApp,
     extraEnv,
   });
@@ -60,27 +62,204 @@ export function waspBuild({
 }): Promise<{ exitCode: number | null }> {
   return spawnWithLog({
     name: "wasp-build",
-    cmd: waspCliCmd,
-    args: ["build"],
+    cmd: waspCliCmd.cmd,
+    args: [...waspCliCmd.args, "build"],
     cwd: pathToApp,
   });
 }
 
+export function waspBuildStart({
+  waspCliCmd,
+  pathToApp,
+  serverEnvVars,
+  clientEnvVars,
+  serverEnvFile,
+  clientEnvFile,
+}: {
+  waspCliCmd: WaspCliCmd;
+  pathToApp: PathToApp;
+  serverEnvVars?: EnvVars;
+  clientEnvVars?: EnvVars;
+  serverEnvFile?: string;
+  clientEnvFile?: string;
+}): Promise<{ exitCode: number | null }> {
+  const args = [
+    "build",
+    "start",
+    ...(serverEnvVars
+      ? Object.entries(serverEnvVars).flatMap(([key, value]) => [
+          "--server-env",
+          `${key}=${value}`,
+        ])
+      : []),
+    ...(clientEnvVars
+      ? Object.entries(clientEnvVars).flatMap(([key, value]) => [
+          "--client-env",
+          `${key}=${value}`,
+        ])
+      : []),
+    ...(serverEnvFile ? ["--server-env-file", serverEnvFile] : []),
+    ...(clientEnvFile ? ["--client-env-file", clientEnvFile] : []),
+  ];
+
+  return spawnWithLog({
+    name: "wasp-build-start",
+    cmd: waspCliCmd.cmd,
+    args: [...waspCliCmd.args, ...args],
+    cwd: pathToApp,
+  });
+}
+
+export async function getWaspVersion({
+  waspCliCmd,
+  pathToApp,
+}: {
+  waspCliCmd: WaspCliCmd;
+  pathToApp: PathToApp;
+}): Promise<{ waspVersion: WaspVersion }> {
+  const logger = createLogger("wasp-info");
+  const { stdoutData, exitCode } = await spawnAndCollectOutput({
+    name: "wasp-version",
+    cmd: waspCliCmd.cmd,
+    args: [...waspCliCmd.args, "version"],
+    cwd: pathToApp,
+  });
+  const stdoutDataWithoutAnsiChars = stripVTControlCharacters(stdoutData);
+
+  if (exitCode !== 0) {
+    logger.error(`Failed to get wasp version: ${stdoutDataWithoutAnsiChars}`);
+    process.exit(1);
+  }
+
+  const [firstLine] = stdoutData.split("\n");
+  const waspVersion = semver.parse(firstLine);
+
+  if (!waspVersion) {
+    logger.error("Failed to get wasp version");
+    process.exit(1);
+  }
+
+  return {
+    waspVersion: waspVersion as WaspVersion,
+  };
+}
+
+export type AppInfo = {
+  appName: AppName;
+  dbType: DbType;
+};
+
+/**
+ * Wasp 0.26.0 replaced `wasp info` with `wasp show spec`, so we try the new
+ * command first and fall back to the old one for older Wasp versions.
+ */
 export async function waspInfo({
   waspCliCmd,
   pathToApp,
 }: {
   waspCliCmd: WaspCliCmd;
   pathToApp: PathToApp;
-}): Promise<{
-  appName: AppName;
-  dbType: DbType;
-}> {
+}): Promise<AppInfo> {
+  const appInfoFromShowSpec = await getAppInfoFromShowSpec({
+    waspCliCmd,
+    pathToApp,
+  });
+
+  return appInfoFromShowSpec ?? getAppInfoFromInfo({ waspCliCmd, pathToApp });
+}
+
+/**
+ * Returns `null` if `wasp show spec` isn't available (i.e. the app runs an
+ * older Wasp version), so the caller can fall back to `wasp info`.
+ */
+async function getAppInfoFromShowSpec({
+  waspCliCmd,
+  pathToApp,
+}: {
+  waspCliCmd: WaspCliCmd;
+  pathToApp: PathToApp;
+}): Promise<AppInfo | null> {
+  const logger = createLogger("wasp-show-spec");
+  const { stdoutData, stderrData, exitCode } = await spawnAndCollectOutput({
+    name: "wasp-show-spec",
+    cmd: waspCliCmd.cmd,
+    args: [...waspCliCmd.args, "show", "spec", "--json"],
+    cwd: pathToApp,
+  });
+
+  if (exitCode !== 0) {
+    logger.debug(
+      `Falling back to "wasp info", "wasp show spec" failed: ${stripVTControlCharacters(stderrData)}`,
+    );
+    return null;
+  }
+
+  let spec: unknown;
+  try {
+    spec = JSON.parse(stripVTControlCharacters(stdoutData));
+  } catch (error) {
+    logger.error(`Failed to parse the app spec: ${error}`);
+    process.exit(1);
+  }
+
+  if (!isRecord(spec)) {
+    logger.error("Failed to get the app spec");
+    process.exit(1);
+  }
+
+  const appDecl = (Array.isArray(spec.decls) ? spec.decls : []).find(
+    (decl: unknown) => isRecord(decl) && decl.declType === "App",
+  );
+
+  const appName = getAppName(appDecl);
+  if (appName === undefined) {
+    logger.error("Failed to get app name");
+    process.exit(1);
+  }
+
+  if (typeof spec.dbSystem !== "string") {
+    logger.error("Failed to get database type");
+    process.exit(1);
+  }
+
+  return {
+    appName: appName as AppName,
+    dbType: spec.dbSystem === "PostgreSQL" ? DbType.Postgres : DbType.Sqlite,
+  };
+}
+
+/**
+ * Newer Wasp versions (0.26 and later) put the name inside `declValue`, while
+ * older ones (0.25 and earlier) put it in the decl envelope as `declName`.
+ */
+function getAppName(appDecl: unknown): string | undefined {
+  if (!isRecord(appDecl)) {
+    return undefined;
+  }
+  if (
+    isRecord(appDecl.declValue) &&
+    typeof appDecl.declValue.name === "string"
+  ) {
+    return appDecl.declValue.name;
+  }
+  if (typeof appDecl.declName === "string") {
+    return appDecl.declName;
+  }
+  return undefined;
+}
+
+async function getAppInfoFromInfo({
+  waspCliCmd,
+  pathToApp,
+}: {
+  waspCliCmd: WaspCliCmd;
+  pathToApp: PathToApp;
+}): Promise<AppInfo> {
   const logger = createLogger("wasp-info");
   const { stdoutData, exitCode } = await spawnAndCollectOutput({
     name: "wasp-info",
-    cmd: waspCliCmd,
-    args: ["info"],
+    cmd: waspCliCmd.cmd,
+    args: [...waspCliCmd.args, "info"],
     cwd: pathToApp,
   });
   const stdoutDataWithoutAnsiChars = stripVTControlCharacters(stdoutData);
@@ -114,23 +293,27 @@ export async function waspInfo({
   };
 }
 
-export async function waspTsSetup({
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+export async function waspInstall({
   waspCliCmd,
   pathToApp,
 }: {
   waspCliCmd: WaspCliCmd;
   pathToApp: PathToApp;
 }): Promise<void> {
-  const logger = createLogger("wasp-ts-setup");
+  const logger = createLogger("wasp-install");
   const { stderrData, exitCode } = await spawnAndCollectOutput({
-    name: "wasp-ts-setup",
-    cmd: waspCliCmd,
-    args: ["ts-setup"],
+    name: "wasp-install",
+    cmd: waspCliCmd.cmd,
+    args: [...waspCliCmd.args, "install"],
     cwd: pathToApp,
   });
 
   if (exitCode !== 0) {
-    logger.error(`Failed to set up Wasp TypeScript config: ${stderrData}`);
+    logger.error(`Failed to install Wasp project dependencies: ${stderrData}`);
     process.exit(1);
   }
 }

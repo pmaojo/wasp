@@ -1,8 +1,6 @@
----
-title: Env Variables
----
+# Environment variables
 
-We talked about environment variables in the [project setup section](../project/env-vars.md). If you haven't read it, make sure to check it out first. In this section, we'll talk about environment variables in the context of deploying the app.
+We talked about environment variables in the [environment variables reference](../advanced/env-vars.md). If you haven't read it, make sure to check it out first. In this section, we'll talk about environment variables in the context of deploying the app.
 
 While developing our app on our machine, we had the option of using `.env.client` and `.env.server` files which made it easy to define and manage env vars.
 
@@ -10,15 +8,17 @@ However, when we are deploying our app, **`.env.client` and `.env.server` files 
 
 ![Env vars usage in development and production](/img/env/prod_dev_fade_2.svg)
 
-### Client Env Vars
+### Client Env Vars {#client-env-vars}
 
 During the build process, client env vars are injected into the client Javascript code, making them public and readable by anyone. Therefore, you should **never store secrets in them** (such as secret API keys).
 
 When building for production, the `.env.client` file will be ignored, since it is meant to be used only during development.
-Instead, you should provide the production client env vars directly to the build command that turns client code into static files:
+Instead, you should provide the production client env vars directly to the build command that turns client code into static files.
+
+Make sure to check the [required client env vars](../advanced/env-vars.md#client-general-configuration) and set them when building for production, the build will fail if any required env vars are missing.
 
 ```shell
-REACT_APP_API_URL=<url_to_wasp_backend> REACT_APP_SOME_OTHER_VAR_NAME=someothervalue npm run build
+REACT_APP_API_URL=<url_to_wasp_backend> REACT_APP_SOME_OTHER_VAR_NAME=someothervalue npx vite build
 ```
 
 Also, notice **that you can't and shouldn't provide client env vars to the client code by setting them on the hosting provider** (unlike providing server env vars to the server app, in that case this is how you should do it). Your client code will ignore those, as at that point client code is just static files.
@@ -37,9 +37,11 @@ You can provide production env vars to your server code in production by definin
 
 ::::caution Set the required env vars
 
-Make sure to go through [all the required server env vars](../project/env-vars.md#server-general-configuration) like `DATABASE_URL`, `WASP_WEB_CLIENT_URL` etc. and set them up in your production environment.
+Make sure to go through [all the required server env vars](../advanced/env-vars.md#server-general-configuration) like `DATABASE_URL`, `WASP_WEB_CLIENT_URL`, `WASP_SERVER_URL`, `PORT` etc. and set them up in your production environment.
 
-**If you are using the [Wasp CLI](./deployment-methods/cli.md)** deployment method, Wasp will set the general configuration env vars for you, but you will need to set the rest of the env vars yourself (like the ones for OAuth auth methods or any other custom env vars you might have defined).
+Even though you don't set these variables in development, they are **required in production** and must be explicitly set. If any of them are missing, your server will fail to start.
+
+**If you are using the [Wasp CLI](./methods/wasp-deploy/overview.md)** deployment method, Wasp will set the general configuration env vars for you, but you will need to set the rest of the env vars yourself (like the ones for OAuth auth methods or any other custom env vars you might have defined).
 ::::
 
 Setting server env variables up will highly depend on where you are deploying your server, but in general it comes down to defining the env vars via mechanisms that your hosting provider provides.
@@ -50,4 +52,4 @@ For example, if you deploy your server to [Fly](https://fly.io), you can define 
 fly secrets set SOME_VAR_NAME=somevalue
 ```
 
-We talk about specific providers in the [PaaS deployment section](./deployment-methods/paas.md) or the [self-hosted deployment section](./deployment-methods/self-hosted.md).
+We talk about specific providers in the [Cloud Providers section](./methods/cloud-providers.md) or the [self-hosted deployment section](./methods/self-hosted.md).

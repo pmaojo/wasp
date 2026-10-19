@@ -1,0 +1,106 @@
+name: Compute artifact names
+description: Central place for computing the artifact names in the CI builds.
+
+inputs:
+  build-name:
+    description: >
+      The build name (e.g., linux-x86_64, macos-aarch64, etc.).
+      The special value "all" can be used to receive a glob that matches all of
+      the build names, and the npm targets of every build.
+      The special value "current" auto-detects the build name from the current
+      runner's OS and architecture.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Resolve build name
+      id: resolve-build-name
+      shell: sh
+      env:
+        INPUT_BUILD_NAME: ${{ inputs.build-name }}
+      run: |
+        if [ "$INPUT_BUILD_NAME" = "all" ]; then
+          build_name="*"
+        elif [ "$INPUT_BUILD_NAME" = "current" ]; then
+          case "${{ runner.os }}-${{ runner.arch }}" in
+            Linux-X64)   build_name="linux-x86_64" ;;
+            Linux-ARM64) build_name="linux-aarch64" ;;
+            macOS-X64)   build_name="macos-x86_64" ;;
+            macOS-ARM64) build_name="macos-aarch64" ;;
+            *)
+              echo "::error::Unsupported platform: ${{ runner.os }}-${{ runner.arch }}"
+              exit 1
+              ;;
+          esac
+        else
+          build_name="$INPUT_BUILD_NAME"
+        fi
+
+        echo "build-name=$build_name" >> "$GITHUB_OUTPUT"
+
+    - name: Check valid build name
+      if: >
+        ! contains(
+          fromJson('[
+            "*",
+            "linux-x86_64",
+            "linux-x86_64-static",
+            "linux-aarch64",
+            "macos-x86_64",
+            "macos-aarch64"
+          ]'),
+          steps.resolve-build-name.outputs.build-name
+        )
+      shell: sh
+      env:
+        BUILD_NAME: ${{ steps.resolve-build-name.outputs.build-name }}
+      run: |
+        echo "::error::Invalid build name provided: $BUILD_NAME."
+        exit 1
+
+    - name: Set artifact names
+      id: set-artifact-names
+      shell: sh
+      env:
+        BUILD_NAME: ${{ steps.resolve-build-name.outputs.build-name }}
+      run: |
+        echo "artifact-name=wasp-cli-${BUILD_NAME}" >> $GITHUB_OUTPUT
+        echo "tarball-name=wasp-${BUILD_NAME}.tar.gz" >> $GITHUB_OUTPUT
+
+    - name: Set npm target
+      id: set-npm-target
+      shell: sh
+      env:
+        BUILD_NAME: ${{ steps.resolve-build-name.outputs.build-name }}
+        NPM_TARGETS: |
+          {
+            "linux-x86_64": { "os": "linux", "cpu": "x64", "libc": "glibc" },
+            "linux-x86_64-static": { "os": "linux", "cpu": "x64", "libc": "musl" },
+            "linux-aarch64": { "os": "linux", "cpu": "arm64", "libc": "glibc" },
+            "macos-x86_64": { "os": "darwin", "cpu": "x64" },
+            "macos-aarch64": { "os": "darwin", "cpu": "arm64" }
+          }
+      run: |
+        echo 'npm-target<<EOF' >>"$GITHUB_OUTPUT"
+        if [ "$BUILD_NAME" = "*" ]; then
+          echo "$NPM_TARGETS" >>"$GITHUB_OUTPUT"
+        else
+          echo "$NPM_TARGETS" |
+            jq --arg buildName "$BUILD_NAME" '.[$buildName]' \
+              >>"$GITHUB_OUTPUT"
+        fi
+        echo 'EOF' >>"$GITHUB_OUTPUT"
+
+outputs:
+  artifact-name:
+    value: ${{ steps.set-artifact-names.outputs.artifact-name }}
+    description: "The name of the artifact attached to the CI build."
+  tarball-name:
+    value: ${{ steps.set-artifact-names.outputs.tarball-name }}
+    description: "The name of the tarball inside the artifact."
+  npm-target:
+    value: ${{ steps.set-npm-target.outputs.npm-target }}
+    description: >
+      A JSON-encoded object of {os, cpu, libc?} for this build. If "all", a
+      JSON-encoded object mapping each build name to its npm target.

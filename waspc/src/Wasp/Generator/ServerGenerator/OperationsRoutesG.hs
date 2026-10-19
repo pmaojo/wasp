@@ -27,7 +27,7 @@ import Wasp.JsImport
   ( JsImportName (..),
     JsImportPath (RelativeImportPath),
     getJsImportStmtAndIdentifier,
-    makeJsImport,
+    makeValueJsImport,
   )
 import qualified Wasp.Util as U
 
@@ -39,16 +39,16 @@ genOperationsRoutes spec =
       [genOperationsRouter spec]
     ]
 
-genActionRoute :: (String, AS.Action.Action) -> Generator FileDraft
-genActionRoute (actionName, action) = genOperationRoute op tmplFile
+genActionRoute :: AS.Action.Action -> Generator FileDraft
+genActionRoute action = genOperationRoute op tmplFile
   where
-    op = AS.Operation.ActionOp actionName action
+    op = AS.Operation.ActionOp action
     tmplFile = C.asTmplFile [relfile|src/routes/operations/_action.js|]
 
-genQueryRoute :: (String, AS.Query.Query) -> Generator FileDraft
-genQueryRoute (queryName, query) = genOperationRoute op tmplFile
+genQueryRoute :: AS.Query.Query -> Generator FileDraft
+genQueryRoute query = genOperationRoute op tmplFile
   where
-    op = AS.Operation.QueryOp queryName query
+    op = AS.Operation.QueryOp query
     tmplFile = C.asTmplFile [relfile|src/routes/operations/_query.js|]
 
 genOperationRoute :: AS.Operation.Operation -> Path' (Rel C.ServerTemplatesDir) File' -> Generator FileDraft
@@ -69,17 +69,17 @@ genOperationRoute operation tmplFile = return $ C.mkTmplFdWithDstAndData tmplFil
 
     (operationImportStmt, operationImportIdentifier) =
       getJsImportStmtAndIdentifier $
-        makeJsImport (RelativeImportPath operationImportPath) (JsImportModule operationName)
+        makeValueJsImport (RelativeImportPath operationImportPath) (JsImportModule operationName)
 
     pathToOperationFile =
       relPosixPathFromOperationsRoutesDirToSrcDir
         </> fromJust (SP.relFileToPosix $ operationFileInSrcDir operation)
 
     operationImportPath =
-      fromJust $
-        SP.parseRelFileP $
-          C.toESModulesImportPath $
-            SP.fromRelFileP pathToOperationFile
+      fromJust
+        $ SP.parseRelFileP
+        $ C.toESModulesImportPath
+        $ SP.fromRelFileP pathToOperationFile
 
 data OperationsRoutesDir
 
@@ -104,8 +104,8 @@ genOperationsRouter spec
     tmplFile = C.asTmplFile [relfile|src/routes/operations/index.js|]
     dstFile = operationsRoutesDirInServerRootDir </> [relfile|index.js|]
     operations =
-      map (uncurry AS.Operation.ActionOp) (AS.getActions spec)
-        ++ map (uncurry AS.Operation.QueryOp) (AS.getQueries spec)
+      map AS.Operation.ActionOp (AS.getActions spec)
+        ++ map AS.Operation.QueryOp (AS.getQueries spec)
     tmplData =
       object
         [ "operationRoutes" .= map makeOperationRoute operations,
@@ -114,7 +114,7 @@ genOperationsRouter spec
     makeOperationRoute operation =
       let operationName = AS.Operation.getName operation
           importPath = fromJust $ SP.relFileToPosix $ SP.castRel $ operationRouteFileInOperationsRoutesDir operation
-          (importStmt, importIdentifier) = getJsImportStmtAndIdentifier $ makeJsImport (RelativeImportPath importPath) (JsImportModule operationName)
+          (importStmt, importIdentifier) = getJsImportStmtAndIdentifier $ makeValueJsImport (RelativeImportPath importPath) (JsImportModule operationName)
        in object
             [ "importIdentifier" .= importIdentifier,
               "importStatement" .= importStmt,

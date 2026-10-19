@@ -1,0 +1,103 @@
+# Keep in sync with .github/actions/setup-tools/action.yaml
+min_version = "2026.9.15"
+
+[tools]
+ghcup = "0.2.6.2"
+
+cabal = "3.16.1.0"
+
+# Holding off GHC 9.10 since HLint doesn't work with it:
+# https://github.com/haskell/haskell-language-server/issues/4674
+"mise-ghcup:ghc" = "9.6.7"
+
+# When upgrading the HLS version, we need to ensure compatibility with our GHC
+# version. You can see the compatibility table at:
+# https://haskell-language-server.readthedocs.io/en/latest/support/ghc-version-support.html
+# Check that the HLS version has a prebuilt binary for the GHC version we are
+# using by running the following command:
+# `type haskell-language-server-$(ghc --numeric-version)`
+"mise-ghcup:hls" = "2.14.0.0"
+
+# Use the same version as the one used inside the HLS binary above. You can run
+# the following command to find the plugin versions (incl. HLint) in the current
+# GHC+HLS combination:
+# `haskell-language-server-$(ghc --numeric-version) --list-plugins`
+"mise-cabal:hlint" = "3.8"
+
+# This should be equal to Wasp's lowest supported Node version.
+# Keep in sync with:
+# - The compiler (Wasp.Node.Version).
+# - The docs: /docs/introduction/quick-start.md ("Requirements" section).
+# - The docs plugin: /web/src/remark/search-and-replace.ts
+# - The web CI: /web/.node-version
+# - The web package: /web/package.json
+# - The wasp-cli package templates: /scripts/make-npm-packages/templates/*/package.json
+# - The embedded packages: /waspc/data/packages/*/package.json
+# (Also just grep for the version in case we forgot somewhere.)
+"node" = "24.14.1"
+
+jq = "1.8.2"
+
+"github:tfausak/cabal-gild" = "1.8.4.2"
+
+# TODO: Provide a fallback for Linux ARM64
+# The upstream repo only distributes prebuilt binaries for Linux x64, macOS
+# (all, and Windows x64.
+# https://github.com/jdx/mise/discussions/10828
+ormolu.version = "0.9.0.0"
+ormolu.os = ["linux/x64", "darwin", "windows/x64"]
+
+"mise-cabal:stan" = "0.2.1.0"
+
+[plugins]
+"vfox-backend:mise-ghcup" = "https://github.com/wasp-lang/mise-ghcup.git#v1.0.0"
+"vfox-backend:mise-cabal" = "https://github.com/wasp-lang/mise-cabal.git#v1.0.0"
+
+[bootstrap.packages]
+# Dependencies for Ubuntu / Debian
+# GHCup dependencies (https://www.haskell.org/ghcup/install/reqs/#linux-ubuntu)
+"apt:build-essential" = "latest"
+"apt:curl" = "latest"
+"apt:libffi-dev" = "latest"
+"apt:libgmp-dev" = "latest"
+"apt:libncurses-dev" = "latest"
+# Cabal dependencies
+"apt:zlib1g-dev" = "latest"
+# mise plugin dependencies
+"apt:git" = "latest"
+
+# Dependencies for Alpine
+# GHCup dependencies (https://www.haskell.org/ghcup/install/reqs/#linux-alpine)
+"apk:binutils-gold" = "latest"
+"apk:curl" = "latest"
+"apk:gcc" = "latest"
+"apk:g++" = "latest"
+"apk:gmp-dev" = "latest"
+"apk:gmp-static" = "latest"
+"apk:libc-dev" = "latest"
+"apk:libffi-dev" = "latest"
+"apk:make" = "latest"
+"apk:musl-dev" = "latest"
+"apk:ncurses-dev" = "latest"
+"apk:perl" = "latest"
+"apk:pkgconfig" = "latest"
+"apk:tar" = "latest"
+"apk:xz" = "latest"
+# `./run` script dependencies
+"apk:bash" = "latest"
+# Cabal dependencies
+"apk:zlib-dev" = "latest"
+"apk:zlib-static" = "latest"
+# Prisma dependencies
+"apk:openssl" = "latest"
+# mise plugin dependencies
+"apk:git" = "latest"
+
+[settings]
+lockfile = true
+experimental = true # Needed for backend plugins (mise-ghcup and mise-cabal) to work.
+
+[settings.node]
+# The Node backend has a knack for compiling from source on Alpine even when
+# there's a pre-built binary available. So we explicitly tell it not to do that.
+compile = false

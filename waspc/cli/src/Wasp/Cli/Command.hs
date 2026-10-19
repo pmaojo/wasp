@@ -8,24 +8,41 @@ module Wasp.Cli.Command
 
     -- * Requirements
 
-    -- See "Wasp.Cli.Command.Requires" for documentation.
+    -- There are some requirements we want to assert in command code, such as
+    -- ensuring the command is being run inside a wasp project directory. We
+    -- might end up wanting to check each requirement multiple times, especially
+    -- if we want the value from it (like getting the wasp project directory),
+    -- but we also want to avoid duplicating work. Using 'require' results in
+    -- checked requirements being stored so they can be immediately retrieved
+    -- when checking the same requirements additional times.
+    --
+    -- See instances of 'Requirable' (each in its own module under
+    -- @Wasp.Cli.Command.Require@) for what kinds of requirements are supported.
+    -- To implement a new requirable type, give your type an instance of
+    -- 'Requirable' in its own module under @Wasp.Cli.Command.Require@.
     require,
     Requirable (checkRequirement),
   )
 where
 
+import Control.Concurrent (threadDelay)
+import Control.Monad.Catch (MonadCatch, MonadMask, MonadThrow)
 import Control.Monad.Error.Class (MonadError)
 import Control.Monad.Except (ExceptT, runExceptT)
-import Control.Monad.IO.Class (MonadIO)
+import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad.State.Strict (StateT, evalStateT, gets, modify)
 import Data.Data (Typeable, cast)
 import Data.Maybe (mapMaybe)
 import System.Exit (exitFailure)
 import Wasp.Cli.Message (cliSendMessage)
 import qualified Wasp.Message as Msg
+import Wasp.Util.IO.Retry (MonadRetry (..))
 
 newtype Command a = Command {_runCommand :: StateT [Requirement] (ExceptT CommandError IO) a}
-  deriving (Functor, Applicative, Monad, MonadIO, MonadError CommandError)
+  deriving (Functor, Applicative, Monad, MonadIO, MonadError CommandError, MonadThrow, MonadCatch, MonadMask)
+
+instance MonadRetry Command where
+  rThreadDelay = liftIO . threadDelay
 
 runCommand :: Command a -> IO ()
 runCommand cmd = do
@@ -40,9 +57,9 @@ runCommand cmd = do
 data CommandError = CommandError {_errorTitle :: !String, _errorMsg :: !String}
 
 data Requirement where
-  Requirement :: Requirable r => r -> Requirement
+  Requirement :: (Requirable r) => r -> Requirement
 
-class Typeable r => Requirable r where
+class (Typeable r) => Requirable r where
   -- | Check if the requirement is met and return a value representing that
   -- requirement.
   --
@@ -59,7 +76,7 @@ class Typeable r => Requirable r where
 -- do
 --   HasDbConnection <- require
 -- @
-require :: Requirable r => Command r
+require :: (Requirable r) => Command r
 require =
   Command (gets (mapMaybe cast)) >>= \case
     (req : _) -> return req

@@ -1,0 +1,108 @@
+module Wasp.Generator.SdkGenerator.Client.AppG
+  ( genClientApp,
+  )
+where
+
+import Data.Aeson (object, (.=))
+import Data.List (intercalate)
+import StrongPath (relfile)
+import qualified StrongPath as SP
+import Wasp.AppSpec (AppSpec)
+import qualified Wasp.AppSpec.App as AS.App
+import qualified Wasp.AppSpec.App.Auth as AS.Auth
+import Wasp.AppSpec.Valid (getApp, isAuthEnabled)
+import Wasp.Generator.AuthProviders.OAuth (clientOAuthCallbackPath)
+import Wasp.Generator.FileDraft (FileDraft)
+import Wasp.Generator.Monad (Generator)
+import Wasp.Generator.SdkGenerator.Auth.Common (getOnAuthSucceededRedirectToOrDefault)
+import qualified Wasp.Generator.SdkGenerator.Common as C
+import qualified Wasp.Generator.WebAppGenerator.Common as WebApp
+import qualified Wasp.Generator.WebSocket as WS
+import Wasp.Util ((<++>))
+import Wasp.Util.Js (makeJsStringLiteral)
+
+genClientApp :: AppSpec -> Generator [FileDraft]
+genClientApp spec =
+  sequence
+    [ genAppIndex spec,
+      genWaspAppComponent spec
+    ]
+    <++> genLayout spec
+    <++> genRouter spec
+    <++> genAuthPages spec
+
+genAppIndex :: AppSpec -> Generator FileDraft
+genAppIndex spec =
+  return $
+    C.mkTmplFdWithData
+      [relfile|client/app/index.tsx|]
+      (object ["isAuthEnabled" .= isAuthEnabled spec])
+
+genWaspAppComponent :: AppSpec -> Generator FileDraft
+genWaspAppComponent spec =
+  return $
+    C.mkTmplFdWithData
+      [relfile|client/app/components/WaspApp.tsx|]
+      (object ["areWebSocketsUsed" .= WS.areWebSocketsUsed spec])
+
+genRouter :: AppSpec -> Generator [FileDraft]
+genRouter spec =
+  sequence
+    [ return $
+        C.mkTmplFdWithData
+          [relfile|client/app/router.tsx|]
+          ( object
+              [ "isExternalAuthEnabled" .= isExternalAuthEnabled,
+                "oAuthCallbackPath" .= clientOAuthCallbackPath,
+                "baseDir" .= SP.fromAbsDirP (WebApp.getBaseDir spec)
+              ]
+          )
+    ]
+  where
+    maybeAuth = AS.App.auth $ getApp spec
+    isExternalAuthEnabled = maybe False AS.Auth.isExternalAuthEnabled maybeAuth
+
+genAuthPages :: AppSpec -> Generator [FileDraft]
+genAuthPages spec =
+  case maybeAuth of
+    Nothing -> return []
+    Just auth ->
+      sequence $
+        genCreateAuthRequiredPage auth
+          : [genOAuthCallbackPage auth | AS.Auth.isExternalAuthEnabled auth]
+  where
+    maybeAuth = AS.App.auth $ getApp spec
+
+genCreateAuthRequiredPage :: AS.Auth.Auth -> Generator FileDraft
+genCreateAuthRequiredPage auth =
+  return $
+    C.mkTmplFdWithData
+      [relfile|client/app/pages/createAuthRequiredPage.jsx|]
+      (object ["onAuthFailedRedirectTo" .= makeJsStringLiteral (AS.Auth.onAuthFailedRedirectTo auth)])
+
+genOAuthCallbackPage :: AS.Auth.Auth -> Generator FileDraft
+genOAuthCallbackPage auth =
+  return $
+    C.mkTmplFdWithData
+      [relfile|client/app/pages/OAuthCallback.tsx|]
+      (object ["onAuthSucceededRedirectTo" .= makeJsStringLiteral (getOnAuthSucceededRedirectToOrDefault auth)])
+
+genLayout :: AppSpec -> Generator [FileDraft]
+genLayout spec =
+  sequence
+    [ genLayoutFile
+    ]
+  where
+    genLayoutFile =
+      return $
+        C.mkTmplFdWithData
+          [relfile|client/app/layout.tsx|]
+          ( object
+              [ "title" .= (AS.App.title (getApp spec) :: String),
+                "metaDescription" .= (AS.App.metaDescription (getApp spec) :: Maybe String),
+                "ogTitle" .= (AS.App.ogTitle (getApp spec) :: Maybe String),
+                "ogDescription" .= (AS.App.ogDescription (getApp spec) :: Maybe String),
+                "canonicalUrl" .= (AS.App.canonicalUrl (getApp spec) :: Maybe String),
+                "head" .= (maybe "" (intercalate "\n") (AS.App.head $ getApp spec) :: String)
+              ]
+          )

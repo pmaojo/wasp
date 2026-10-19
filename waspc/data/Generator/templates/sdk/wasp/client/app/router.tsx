@@ -1,0 +1,46 @@
+{{={= =}=}}
+import type { ReactNode } from 'react'
+import type { RouteObject } from 'react-router'
+
+{=# isExternalAuthEnabled =}
+import { OAuthCallbackPage } from "./pages/OAuthCallback"
+{=/ isExternalAuthEnabled =}
+
+import { DefaultRootErrorBoundary } from '@wasp.sh/lib-sdk-core/browser'
+
+import { routes } from '../router/index'
+
+type RouteMapping = Record<string, RouteObject>;
+
+export function getRouteObjects({
+  routesMapping,
+  rootElement,
+}: {
+  routesMapping: RouteMapping,
+  rootElement: ReactNode,
+}): RouteObject[] {
+  const waspDefinedRoutes: RouteObject[] = [
+    {=# isExternalAuthEnabled =}
+    {
+      path: "{= oAuthCallbackPath =}",
+      Component: OAuthCallbackPage,
+    },
+    {=/ isExternalAuthEnabled =}
+  ]
+  const userDefinedRoutes = Object.entries(routes).map(([routeKey, route]) => {
+    return {
+      path: route.to,
+      ...routesMapping[routeKey],
+    }
+  })
+
+  return [{
+    path: '/',
+    element: rootElement,
+    ErrorBoundary: DefaultRootErrorBoundary,
+    children: [
+      ...waspDefinedRoutes,
+      ...userDefinedRoutes,
+    ],
+  }]
+}

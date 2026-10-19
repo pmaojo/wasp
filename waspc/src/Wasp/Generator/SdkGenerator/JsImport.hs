@@ -1,38 +1,29 @@
 module Wasp.Generator.SdkGenerator.JsImport
-  ( extOperationImportToImportJson,
-    extImportToImportJson,
+  ( extImportToImportJson,
   )
 where
 
 import qualified Data.Aeson as Aeson
-import Data.Maybe (fromJust)
-import StrongPath ((</>))
-import qualified StrongPath as SP
 import qualified Wasp.AppSpec.ExtImport as EI
-import Wasp.Generator.Common (dropExtensionFromImportPath)
 import qualified Wasp.Generator.JsImport as GJI
-import qualified Wasp.Generator.SdkGenerator.Common as C
-import Wasp.JsImport (JsImport (..), JsImportPath (..))
+import qualified Wasp.Generator.SdkGenerator.VirtualUserModules as VUM
+import Wasp.JsImport (JsImport (..), JsImportKind (ValueImport))
 
 extImportToImportJson :: Maybe EI.ExtImport -> Aeson.Value
 extImportToImportJson maybeExtImport = GJI.jsImportToImportJson jsImport
   where
     jsImport = extImportToJsImport <$> maybeExtImport
 
-extOperationImportToImportJson :: EI.ExtImport -> Aeson.Value
-extOperationImportToImportJson =
-  GJI.jsImportToImportJson
-    . Just
-    . extImportToJsImport
-
-extImportToJsImport :: EI.ExtImport -> JsImport
-extImportToJsImport extImport@(EI.ExtImport extImportName extImportPath) =
+extImportToJsImport ::
+  EI.ExtImport ->
   JsImport
-    { _path = ModuleImportPath importPath,
+extImportToJsImport extImport@(EI.ExtImport extImportName extImportPath _) =
+  JsImport
+    { _kind = ValueImport,
+      _path = importPath,
       _name = importName,
-      _importAlias = Just $ EI.importIdentifier extImport ++ "_ext"
+      _importAlias = Just $ GJI.getAliasedExtImportIdentifier extImport
     }
   where
-    importPath = C.makeSdkImportPath $ dropExtensionFromImportPath $ extCodeDirP </> SP.castRel extImportPath
-    extCodeDirP = fromJust $ SP.relDirToPosix C.extSrcDirInSdkRootDir
     importName = GJI.extImportNameToJsImportName extImportName
+    importPath = VUM.extImportToVirtualUserModuleJsImportPath extImportPath

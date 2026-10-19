@@ -7,19 +7,47 @@ module Wasp.AppSpec.Route
   )
 where
 
-import Data.Aeson (FromJSON)
+import Data.Aeson (FromJSON, ToJSON)
 import Data.Data (Data)
 import GHC.Generics (Generic)
-import Wasp.AppSpec.Core.IsDecl (IsDecl)
-import Wasp.AppSpec.Core.Ref (Ref)
-import Wasp.AppSpec.Page
+import Wasp.AppSpec.Core.IsDecl (IsDecl (..))
+import Wasp.AppSpec.Core.Ref (Ref, refName)
+import Wasp.AppSpec.Page (Page)
+import Wasp.Inspectable (Inspectable (..), InspectionEntry (InspectionEntry))
 
 data Route = Route
-  { path :: String,
+  { name :: String,
+    path :: String,
     -- TODO: In the future we might want to add other types of targets, for example another Route.
     --   For that the best solution is probably to implement sum types (https://github.com/wasp-lang/wasp/issues/381).
-    to :: Ref Page
+    to :: Ref Page,
+    lazy :: Maybe Bool,
+    -- | Concrete static paths to prerender at build time (empty when
+    -- prerendering is disabled). The public @prerender: true@ shorthand is
+    -- normalized to @[routePath]@ by the spec mappers (in the TS @spec@
+    -- package), so by the time it reaches here it is always a list of paths.
+    prerender :: [String]
   }
-  deriving (Show, Eq, Data, Generic, FromJSON)
+  deriving (Show, Eq, Data, Generic, FromJSON, ToJSON)
 
-instance IsDecl Route
+instance IsDecl Route where
+  declName = name
+
+instance Inspectable Route where
+  inspect route =
+    InspectionEntry
+      "Routes"
+      ( [ ("Name", route.name),
+          ("Path", route.path),
+          ("Destination", refName route.to),
+          ("Loading", if route.lazy == Just False then "Eager" else "Lazy")
+        ]
+          ++ [("Prerender", "Enabled") | not $ null route.prerender]
+      )
+      : [ InspectionEntry
+            "Prerendered routes"
+            [ ("Name", route.name),
+              ("Route", prerenderPath)
+            ]
+        | prerenderPath <- route.prerender
+        ]

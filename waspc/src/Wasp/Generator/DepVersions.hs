@@ -1,19 +1,77 @@
 module Wasp.Generator.DepVersions
-  ( prismaVersion,
-    superjsonVersion,
-    typescriptVersion,
+  ( prismaVersionRange,
+    superjsonVersionRange,
+    typescriptVersionRange,
+    reactVersionRange,
+    reactDomVersionRange,
+    reactTypesVersionRange,
+    reactDomTypesVersionRange,
+    reactRouterVersionRange,
+    reactHelmetAsyncVersionRange,
+    reactQueryVersionRange,
+    expressVersionRange,
+    expressTypesVersionRange,
+    viteVersionRange,
+    vitestVersionRange,
+    dotenvVersionRange,
+    kyVersionRange,
   )
 where
 
 import qualified Wasp.SemanticVersion as SV
 
-prismaVersion :: SV.Version
--- NOTE: If changing prisma version here, also change it in waspc/packages/prisma/package.json.
---       Then, make sure `data/Generator/templates/sdk/wasp/prisma-runtime-library.d.ts` is up to date.
-prismaVersion = SV.Version 5 19 1
+-- When updating the value, also update it in `waspc/packages/prisma/package.json`.
+-- Also ensure `data/Generator/templates/sdk/wasp/prisma-runtime-library.d.ts` is up to date.
+prismaVersionRange :: SV.Range
+prismaVersionRange = [SV.r|5.19.1|]
 
-superjsonVersion :: SV.ComparatorSet
-superjsonVersion = SV.backwardsCompatibleWith $ SV.Version 2 2 1
+superjsonVersionRange :: SV.Range
+superjsonVersionRange = [SV.r|^2.2.1|]
 
-typescriptVersion :: SV.Version
-typescriptVersion = SV.Version 5 8 2
+typescriptVersionRange :: SV.Range
+typescriptVersionRange = [SV.r|6.0.3|]
+
+-- When updating the React version,
+-- also update it in `peerDependencies` in `waspc/libs/auth/package.json`.
+reactVersionRange :: SV.Range
+reactVersionRange = [SV.r|^19.2.1|]
+
+-- React and ReactDOM versions should always match.
+reactDomVersionRange :: SV.Range
+reactDomVersionRange = reactVersionRange
+
+-- Follows React major version.
+-- When updating the value, also update it in `devDependencies` in `waspc/libs/auth/package.json`.
+reactTypesVersionRange :: SV.Range
+reactTypesVersionRange = [SV.r|^19.2.7|]
+
+reactDomTypesVersionRange :: SV.Range
+reactDomTypesVersionRange = [SV.r|^19.2.3|]
+
+reactRouterVersionRange :: SV.Range
+reactRouterVersionRange = [SV.r|^8.0.1|]
+
+-- Used by the page metadata (PageHelmet) support of the web app.
+reactHelmetAsyncVersionRange :: SV.Range
+reactHelmetAsyncVersionRange = [SV.r|^1.3.0|]
+
+reactQueryVersionRange :: SV.Range
+reactQueryVersionRange = [SV.r|~4.42.0|]
+
+expressVersionRange :: SV.Range
+expressVersionRange = [SV.r|~5.1.0|]
+
+expressTypesVersionRange :: SV.Range
+expressTypesVersionRange = [SV.r|^5.0.0|]
+
+viteVersionRange :: SV.Range
+viteVersionRange = [SV.r|^8.1.0|]
+
+vitestVersionRange :: SV.Range
+vitestVersionRange = [SV.r|^4.1.9|]
+
+dotenvVersionRange :: SV.Range
+dotenvVersionRange = [SV.r|^16.6.1|]
+
+kyVersionRange :: SV.Range
+kyVersionRange = [SV.r|^2.0.0|]

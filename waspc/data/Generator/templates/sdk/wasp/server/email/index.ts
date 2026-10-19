@@ -1,7 +1,7 @@
 {{={= =}=}}
 import { env } from '../env.js';
 import { initEmailSender } from "./core/index.js";
-import { EmailSender } from "./core/types.js";
+import type { EmailSender } from "./core/types.js";
 
 {=# isSmtpProviderEnabled =}
 const emailProvider = { 
@@ -26,6 +26,12 @@ const emailProvider = {
   apiUrl: env.MAILGUN_API_URL,
 } as const;
 {=/ isMailgunProviderEnabled =}
+{=# isResendProviderEnabled =}
+const emailProvider = {
+  type: "resend",
+  apiKey: env.RESEND_API_KEY,
+} as const;
+{=/ isResendProviderEnabled =}
 {=# isDummyProviderEnabled =}
 const emailProvider = {
   type: "dummy",

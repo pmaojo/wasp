@@ -1,11 +1,9 @@
 {{={= =}=}}
-import { useContext } from 'react'
-import { useForm, UseFormReturn } from 'react-hook-form'
-import { styled } from 'wasp/core/stitches.config'
-import { config } from 'wasp/client'
-
-import { AuthContext } from '../../Auth'
+import { useForm, type UseFormReturn } from 'react-hook-form'
+import styles from './LoginSignupForm.module.css'
+import { config } from '../../../../client/index.js'
 import {
+  clsx,
   Form,
   FormInput,
   FormItemGroup,
@@ -13,19 +11,23 @@ import {
   FormError,
   FormTextarea,
   SubmitButton,
-} from '../Form'
-import type {
-  AdditionalSignupFields,
-  AdditionalSignupField,
-  AdditionalSignupFieldRenderFn,
-  FormState,
-} from '../../types'
+  type AdditionalSignupFields,
+  type AdditionalSignupField,
+  type AdditionalSignupFieldRenderFn,
+  type FormState,
+} from '@wasp.sh/lib-sdk-core/browser'
+
+import { useAuthContext } from '@wasp.sh/lib-auth/browser'
+{=# enabledProviders.isEmailAuthEnabled =}
+import { emailFieldRules, emailInputProps } from '@wasp.sh/lib-sdk-core/browser'
+{=/ enabledProviders.isEmailAuthEnabled =}
 {=# isSocialAuthEnabled =}
-import * as SocialIcons from '../social/SocialIcons'
-import { SocialButton } from '../social/SocialButton'
+import * as SocialIcons from '@wasp.sh/lib-sdk-core/browser'
+import { SocialButton } from '@wasp.sh/lib-sdk-core/browser'
 {=/ isSocialAuthEnabled =}
 {=# isAnyPasswordBasedAuthEnabled =}
-import { useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router'
+import { getAuthErrorMessage } from '@wasp.sh/lib-sdk-core/browser'
 {=/ isAnyPasswordBasedAuthEnabled =}
 {=# enabledProviders.isUsernameAndPasswordAuthEnabled =}
 import { useUsernameAndPassword } from '../usernameAndPassword/useUsernameAndPassword'
@@ -35,75 +37,8 @@ import { useEmail } from '../email/useEmail'
 {=/ enabledProviders.isEmailAuthEnabled =}
 
 {=# areBothSocialAndPasswordBasedAuthEnabled =}
-const OrContinueWith = styled('div', {
-    position: 'relative',
-    marginTop: '1.5rem'
-})
-  
-const OrContinueWithLineContainer = styled('div', {
-    position: 'absolute',
-    inset: '0px',
-    display: 'flex',
-    alignItems: 'center'
-})
-
-const OrContinueWithLine = styled('div', {
-    width: '100%',
-    borderTopWidth: '1px',
-    borderColor: '$gray500'
-})
-
-const OrContinueWithTextContainer = styled('div', {
-    position: 'relative',
-    display: 'flex',
-    justifyContent: 'center',
-    fontSize: '$sm'
-})
-
-const OrContinueWithText = styled('span', {
-    backgroundColor: 'white',
-    paddingLeft: '0.5rem',
-    paddingRight: '0.5rem'
-})
 {=/ areBothSocialAndPasswordBasedAuthEnabled =}
 {=# isSocialAuthEnabled =}
-const SocialAuth = styled('div', {
-    marginTop: '1.5rem'
-})
-
-const SocialAuthLabel = styled('div', {
-    fontWeight: '500',
-    fontSize: '$sm'
-})
-
-const SocialAuthButtons = styled('div', {
-    marginTop: '0.5rem',
-    display: 'flex',
-
-    variants: {
-        direction: {
-            horizontal: {
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(48px, 1fr))',
-            },
-            vertical: {
-                flexDirection: 'column',
-                margin: '8px 0',
-            }
-        },
-        gap: {
-            small: {
-                gap: '4px',
-            },
-            medium: {
-                gap: '8px',
-            },
-            large: {
-                gap: '16px',
-            }
-        }
-    }
-})
 {=/ isSocialAuthEnabled =}
 {=# enabledProviders.isSlackAuthEnabled =}
 const slackSignInUrl = `${config.apiUrl}{= slackSignInPath =}`
@@ -120,22 +55,22 @@ const keycloakSignInUrl = `${config.apiUrl}{= keycloakSignInPath =}`
 {=# enabledProviders.isGitHubAuthEnabled =}
 const gitHubSignInUrl = `${config.apiUrl}{= gitHubSignInPath =}`
 {=/ enabledProviders.isGitHubAuthEnabled =}
+{=# enabledProviders.isMicrosoftAuthEnabled =}
+const microsoftSignInUrl = `${config.apiUrl}{= microsoftSignInPath =}`
+{=/ enabledProviders.isMicrosoftAuthEnabled =}
 
-{=!
-// Since we allow users to add additional fields to the signup form, we don't
-// know the exact shape of the form values. We are assuming that the form values
-// will be a flat object with string values.
-=}
-// PRIVATE API
-export type LoginSignupFormFields = {
-  [key: string]: string;
-}
+import type { LoginSignupFormFields } from '@wasp.sh/lib-sdk-core/browser'
+
 
 // PRIVATE API
 export const LoginSignupForm = ({
     state,
+    {=# isSocialAuthEnabled =}
     socialButtonsDirection = 'horizontal',
+    {=/ isSocialAuthEnabled =}
+    {=# isAnyPasswordBasedAuthEnabled =}
     additionalSignupFields,
+    {=/ isAnyPasswordBasedAuthEnabled =}
 }: {
     state: 'login' | 'signup'
     socialButtonsDirection?: 'horizontal' | 'vertical'
@@ -146,13 +81,13 @@ export const LoginSignupForm = ({
     setErrorMessage,
     setSuccessMessage,
     setIsLoading,
-  } = useContext(AuthContext)
+  } = useAuthContext();
   const isLogin = state === 'login'
   const cta = isLogin ? 'Log in' : 'Sign up';
   {=# isAnyPasswordBasedAuthEnabled =}
   const navigate = useNavigate();
-  const onErrorHandler = (error) => {
-    setErrorMessage({ title: error.message, description: error.data?.data?.message })
+  const onErrorHandler = (error: unknown) => {
+    setErrorMessage(getAuthErrorMessage(error));
   };
   {=/ isAnyPasswordBasedAuthEnabled =}
   const hookForm = useForm<LoginSignupFormFields>()
@@ -162,7 +97,7 @@ export const LoginSignupForm = ({
     isLogin,
     onError: onErrorHandler,
     onSuccess() {
-      navigate('{= onAuthSucceededRedirectTo =}')
+      navigate({=& onAuthSucceededRedirectTo =})
     },
   });
   {=/ enabledProviders.isUsernameAndPasswordAuthEnabled =}
@@ -175,17 +110,22 @@ export const LoginSignupForm = ({
       setSuccessMessage(`You've signed up successfully! Check your email for the confirmation link.`)
     },
     onLoginSuccess() {
-      navigate('{= onAuthSucceededRedirectTo =}')
+      navigate({=& onAuthSucceededRedirectTo =})
     },
   });
   {=/ enabledProviders.isEmailAuthEnabled =}
   {=# isAnyPasswordBasedAuthEnabled =}
-  async function onSubmit (data) {
+  async function onSubmit(data: LoginSignupFormFields): Promise<void> {
     setIsLoading(true);
     setErrorMessage(null);
     setSuccessMessage(null);
     try {
-      await handleSubmit(data);
+      // We assert the type because the form holds raw input strings, while the
+      // signup data type uses the return types of the user's signup field
+      // getters (e.g. `Promise<string>` for an async getter).
+      // TODO: Close the type gap between the forms and the user's signup fields,
+      // so this assertion can go away.
+      await handleSubmit(data as Parameters<typeof handleSubmit>[0]);
     } finally {
       setIsLoading(false);
     }
@@ -194,9 +134,9 @@ export const LoginSignupForm = ({
 
   return (<>
       {=# isSocialAuthEnabled =}
-        <SocialAuth>
-          <SocialAuthLabel>{cta} with</SocialAuthLabel>
-          <SocialAuthButtons gap='large' direction={socialButtonsDirection}>
+        <div className={styles.socialAuth}>
+          <div className={styles.socialAuthLabel}>{cta} with</div>
+            <div className={clsx(styles.socialAuthButtons, styles[socialButtonsDirection])}>
             {=# enabledProviders.isSlackAuthEnabled =}
               <SocialButton href={slackSignInUrl}><SocialIcons.Slack/></SocialButton>
             {=/ enabledProviders.isSlackAuthEnabled =}
@@ -216,18 +156,22 @@ export const LoginSignupForm = ({
             {=# enabledProviders.isGitHubAuthEnabled =}
               <SocialButton href={gitHubSignInUrl}><SocialIcons.GitHub/></SocialButton>
             {=/ enabledProviders.isGitHubAuthEnabled =}
-          </SocialAuthButtons>
-        </SocialAuth>
+
+            {=# enabledProviders.isMicrosoftAuthEnabled =}
+              <SocialButton href={microsoftSignInUrl}><SocialIcons.Microsoft/></SocialButton>
+            {=/ enabledProviders.isMicrosoftAuthEnabled =}
+          </div>
+        </div>
       {=/ isSocialAuthEnabled =}
       {=# areBothSocialAndPasswordBasedAuthEnabled =}
-        <OrContinueWith>
-          <OrContinueWithLineContainer>
-            <OrContinueWithLine/>
-          </OrContinueWithLineContainer>
-          <OrContinueWithTextContainer>
-            <OrContinueWithText>Or continue with</OrContinueWithText>
-          </OrContinueWithTextContainer>
-        </OrContinueWith>
+        <div className={styles.orContinueWith}>
+          <div className={styles.orContinueWithLineContainer}>
+            <div className={styles.orContinueWithLine}/>
+          </div>
+          <div className={styles.orContinueWithTextContainer}>
+            <span className={styles.orContinueWithText}>Or continue with</span>
+          </div>
+        </div>
       {=/ areBothSocialAndPasswordBasedAuthEnabled =}
       {=# isAnyPasswordBasedAuthEnabled =}
         <Form onSubmit={hookFormHandleSubmit(onSubmit)}>
@@ -248,10 +192,8 @@ export const LoginSignupForm = ({
           <FormItemGroup>
             <FormLabel>E-mail</FormLabel>
             <FormInput
-              {...register('email', {
-                required: 'Email is required',
-              })}
-              type="email"
+              {...register('email', emailFieldRules)}
+              {...emailInputProps}
               disabled={isLoading}
             />
             {errors.email && <FormError>{errors.email.message}</FormError>}

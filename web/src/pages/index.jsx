@@ -1,39 +1,29 @@
 import Head from "@docusaurus/Head";
 import useDocusaurusContext from "@docusaurus/useDocusaurusContext";
-import classNames from "classnames";
 
-import ExampleWaspApps from "../components/ExampleWaspApps";
-import Faq from "../components/Faq.jsx";
-import Features from "../components/Features";
+import AI from "../components/AI";
+import ExampleApps from "../components/ExampleApps";
+import Faq from "../components/Faq";
+import FeaturesExplorer from "../components/FeaturesExplorer";
 import Footer from "../components/Footer";
 import Hero from "../components/Hero";
 import HowItWorks from "../components/HowItWorks";
 import Nav from "../components/Nav/index";
 import Newsletter from "../components/Newsletter";
+import NoLockIn from "../components/NoLockIn";
+import OpenSaas from "../components/OpenSaas";
+import Philosophy from "../components/Philosophy";
+import Properties from "../components/Properties";
 import Roadmap from "../components/Roadmap";
-import ShowcaseGallery from "../components/ShowcaseGallery";
+import ShippedWithWasp from "../components/ShippedWithWasp";
 import Testimonials from "../components/Testimonials";
+import Waspeteers from "../components/Waspeteers";
 
 import waspCoverPhoto from "../../static/img/wasp_twitter_cover.png";
 import "./index.css";
 import "./preflight.css";
-import styles from "./styles.module.css";
 
 import "../prism/prismCustomization";
-
-const Background = () => {
-  return (
-    <div className="pointer-events-none absolute left-0 top-0 h-full w-full overflow-hidden">
-      <span className={classNames(styles.leftLights, "opacity-100")} />
-    </div>
-  );
-};
-
-const LightsTwo = () => (
-  <div className="pointer-events-none absolute left-0 top-[1800px] h-full w-full overflow-hidden lg:top-[1000px]">
-    <span className={classNames(styles.lightsTwo, "opacity-100")} />
-  </div>
-);
 
 const Index = () => {
   const { siteConfig } = useDocusaurusContext();
@@ -61,16 +51,20 @@ const Index = () => {
       <Nav />
       <div className="min-h-screen">
         <main>
-          <Background />
           <div>
             {/* container */}
             <Hero />
-            <Features />
+            <Properties />
+            <FeaturesExplorer />
+            <AI />
             <HowItWorks />
-            <ExampleWaspApps />
+            <NoLockIn />
+            <ExampleApps />
+            <ShippedWithWasp />
             <Testimonials />
-            <LightsTwo />
-            <ShowcaseGallery />
+            <Waspeteers />
+            <Philosophy />
+            <OpenSaas />
             <Newsletter />
             <Roadmap />
             <Faq />

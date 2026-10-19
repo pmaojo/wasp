@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router";
 
 import addWaspSourceHeader from "../common/addWaspSourceHeader";
 import EmailAndPassForm from "./components/EmailAndPassForm";
@@ -16,7 +16,7 @@ const SignupPage = () => {
   const [passwordFieldVal, setPasswordFieldVal] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
 
-  const handleSignup = async (event: React.FormEvent<HTMLFormElement>) => {
+  const handleSignup = async (event: React.SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
     setErrorMessage("");
 

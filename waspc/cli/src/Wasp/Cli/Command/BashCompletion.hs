@@ -5,48 +5,54 @@ module Wasp.Cli.Command.BashCompletion
   )
 where
 
-import Control.Exception (assert)
 import Control.Monad.IO.Class (liftIO)
 import Data.List (isPrefixOf)
 import Paths_waspc (getDataFileName)
 import qualified System.Environment as ENV
 import Wasp.Cli.Command (Command)
+import qualified Wasp.Cli.Command.Show as Command.Show
+import qualified Wasp.Cli.Command.Show.Subcommand as Command.Show.Subcommand
+import Wasp.Util.Terminal (styleCode)
 
 -- generate bash completion depending on commands input
 bashCompletion :: Command ()
 bashCompletion = do
   -- COMP_LINE is exposed by the bash `complete` builtin (https://www.gnu.org/software/bash/manual/html_node/Bash-Variables.html)
   inputEntered <- liftIO (ENV.getEnv "COMP_LINE")
-  let inputWords = words inputEntered
-  let inputArgs = assert (head inputArgs == "wasp") $ tail inputWords
+  -- COMP_LINE starts with the name of the program being completed (however the
+  -- user invoked it, e.g. `wasp`, `wasp-cli`, or an custom alias), which we
+  -- drop to get the arguments they entered.
+  let inputArgs = drop 1 (words inputEntered)
   case inputArgs of
     [] -> listCommands commands
     ["db"] -> listCommands dbSubCommands
+    ["show"] -> listCommands showSubCommands
     [cmdPrefix] -> listMatchingCommands cmdPrefix commands
     ["db", cmdPrefix] -> listMatchingCommands cmdPrefix dbSubCommands
+    ["show", cmdPrefix] -> listMatchingCommands cmdPrefix showSubCommands
     _ -> liftIO . putStrLn $ ""
   where
     commands =
       [ "new",
-        "new:ai",
         "version",
-        "waspls",
+        "doctor",
         "completion",
-        "completion:generate",
         "uninstall",
         "start",
         "db",
         "clean",
+        "compile",
         "build",
         "deploy",
         "telemetry",
         "deps",
         "dockerfile",
-        "info",
+        "show",
         "test",
         "studio"
       ]
-    dbSubCommands = ["migrate-dev", "studio"]
+    dbSubCommands = ["start", "reset", "seed", "migrate-dev", "studio"]
+    showSubCommands = Command.Show.Subcommand.name <$> Command.Show.subcommands
     listMatchingCommands :: String -> [String] -> Command ()
     listMatchingCommands cmdPrefix cmdList = listCommands $ filter (cmdPrefix `isPrefixOf`) cmdList
     listCommands :: [String] -> Command ()
@@ -57,19 +63,25 @@ generateBashCompletionScript :: Command ()
 generateBashCompletionScript =
   liftIO $ getDataFileName "Cli/bash-completion" >>= readFile >>= putStr
 
--- return the bash completion instruction
 printBashCompletionInstruction :: Command ()
 printBashCompletionInstruction =
   liftIO . putStrLn $
     unlines
-      [ "Run the following command to generate bash completion script for wasp on your machine:",
+      [ "Setting up Bash auto-completion for Wasp:",
         "",
-        "wasp completion:generate > <your-chosen-directory>/wasp-completion",
+        "1. Add the following line at the end of your shell configuration file:",
+        styleCode "     complete -o default -o nospace -C 'wasp completion:list' wasp",
         "",
-        "After that, depending on your system, you will need to edit your bash profile:",
-        "- on MacOS (OSX): you will normally want to edit ~/.bashrc",
-        "- on Linux: you will normally want to edit ~/.bash_profile",
-        "and add this line:",
-        "  source <your-chosen-directory>/wasp-completion",
-        "then reset your terminal session."
+        "   Default shell configuration file locations:",
+        "   - Bash: " ++ styleCode "~/.bashrc",
+        "   - Zsh: " ++ styleCode "~/.zshrc",
+        "",
+        "   Note for Zsh users: the " ++ styleCode "complete" ++ " builtin is provided by Bash, so you need",
+        "   to enable Bash completion compatibility first by adding this line above it:",
+        styleCode "     autoload -Uz +X bashcompinit && bashcompinit",
+        "   Frameworks like Oh My Zsh enable this by default, so you can skip this step.",
+        "",
+        "2. Save the file and restart your terminal.",
+        "",
+        "Done! Now you can use the TAB key to auto-complete Wasp commands in your shell."
       ]

@@ -9,10 +9,12 @@ import qualified Data.Text as T
 import StrongPath (Abs, Dir, File, Path')
 import Wasp.Cli.Command.CreateNewProject.Common (defaultWaspVersionBounds)
 import Wasp.Cli.Command.CreateNewProject.ProjectDescription (NewProjectAppName (..), NewProjectName)
-import Wasp.NodePackageFFI (InstallablePackage (WaspConfigPackage), getPackageInstallationPath)
-import Wasp.Project.Analyze (WaspFilePath (..))
+import Wasp.NodePackageFFI
+  ( InstallablePackage (WaspSpecPackage),
+    getPackageJsonSpecifierForPackage,
+  )
 import Wasp.Project.Common (WaspProjectDir)
-import Wasp.Project.ExternalConfig.PackageJson (findPackageJsonFile)
+import Wasp.Project.ExternalConfig.PackageJson (findUserPackageJsonFile)
 import Wasp.Project.WaspFile (findWaspFile)
 import Wasp.Util (camelToKebabCase)
 import qualified Wasp.Util.IO as IOUtil
@@ -30,8 +32,7 @@ replaceTemplatePlaceholdersInWaspFile ::
 replaceTemplatePlaceholdersInWaspFile appName projectName projectDir =
   findWaspFile projectDir >>= \case
     Left _error -> return ()
-    Right (WaspLang absMainWaspFile) -> replaceTemplatePlaceholders absMainWaspFile
-    Right (WaspTs absMainTsFile) -> replaceTemplatePlaceholders absMainTsFile
+    Right absMainTsFile -> replaceTemplatePlaceholders absMainTsFile
   where
     replaceTemplatePlaceholders = replaceTemplatePlaceholdersInFileOnDisk appName projectName
 
@@ -41,7 +42,7 @@ replaceTemplatePlaceholdersInWaspFile appName projectName projectDir =
 replaceTemplatePlaceholdersInPackageJsonFile ::
   NewProjectAppName -> NewProjectName -> Path' Abs (Dir WaspProjectDir) -> IO ()
 replaceTemplatePlaceholdersInPackageJsonFile appName projectName projectDir =
-  findPackageJsonFile projectDir >>= \case
+  findUserPackageJsonFile projectDir >>= \case
     Nothing -> return ()
     Just absPackageJsonFile -> do
       let kebabCaseAppName = NewProjectAppName . camelToKebabCase . show $ appName
@@ -49,9 +50,9 @@ replaceTemplatePlaceholdersInPackageJsonFile appName projectName projectDir =
 
 replaceTemplatePlaceholdersInFileOnDisk :: NewProjectAppName -> NewProjectName -> Path' Abs (File f) -> IO ()
 replaceTemplatePlaceholdersInFileOnDisk appName projectName file = do
-  waspConfigPackagePath <- getPackageInstallationPath WaspConfigPackage
+  let waspSpecPackageSpecifier = getPackageJsonSpecifierForPackage WaspSpecPackage
   let waspTemplateReplacements =
-        [ ("__waspConfigPath__", waspConfigPackagePath),
+        [ ("__waspSpecPackageSpecifier__", waspSpecPackageSpecifier),
           ("__waspAppName__", show appName),
           ("__waspProjectName__", show projectName),
           ("__waspVersion__", defaultWaspVersionBounds)

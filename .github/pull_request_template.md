@@ -1,52 +1,66 @@
-### Description
+<!--
+  Thanks for contributing to Wasp!
+  Make sure to follow this PR template, so that we can speed up the review process.
+  It will also help you not forget important steps when making a change.
+  If you don't know how to fill any of the sections below, it's okay to leave
+  them blank and ask for help.
+-->
 
-> Describe your PR! If this PR closes an issue, use “Fixes #(issue_number)" syntax so GitHub will auto-close it when merged.
+## Description
 
-### Select what type of change this PR introduces:
+Replace this message here, and write a high-level overview with any additional
+context (motivation, trade-offs, approaches considered, concerns, ...).
 
-1. [ ] **Just code/docs improvement** (no functional change).
-2. [ ] **Bug fix** (non-breaking change which fixes an issue).
-3. [ ] **New feature** (non-breaking change which adds functionality).
-4. [ ] **Breaking change** (fix or feature that would cause existing functionality to not work as expected).
+## Agreement
 
-### Update Waspc ChangeLog and version if needed
+<!-- Select just one with [x] -->
 
-If you did a **bug fix, new feature, or breaking change**, that affects `waspc`, make sure you satisfy the following:
+- [ ] This is a small, obvious fix (typo, docs corrections, clear small bug with a test).
+- [ ] A maintainer agreed on the approach beforehand: <!-- link to the GitHub issue or Discord thread -->
 
-1. [ ] I updated [`ChangeLog.md`](https://github.com/wasp-lang/wasp/blob/main/waspc/ChangeLog.md) with description of the change this PR introduces.
-2. [ ] I bumped `waspc` version in [`waspc.cabal`](https://github.com/wasp-lang/wasp/blob/main/waspc/waspc.cabal) to reflect changes I introduced, with regards to the version of the latest wasp release, if the bump was needed.
+## Type of change
 
-### Add a regression test if needed
+<!-- Select just one with [x] -->
 
-If you did a **bug fix**, make sure you satisfy the following:
+- [ ] **🔧 Just code/docs improvement** <!-- no functional change -->
+- [ ] **🐞 Bug fix** <!-- non-breaking change which fixes an issue -->
+- [ ] **🚀 New/improved feature** <!-- non-breaking change which adds functionality -->
+- [ ] **💥 Breaking change** <!-- fix or feature that would cause existing functionality to not work as expected -->
 
-1. [ ] I added a regression test that reproduces the bug and verifies the fix.
+## Checklist
 
-If you're unable to add a regression test, please explain why.
-This likely indicates that our current testing setup needs improvement.
+<!--
+  Check all the applicable boxes with [x], and leave the rest empty.
+  If you're unsure about any of them, don't hesitate to ask for help.
+-->
 
-### Update example apps if needed
+- [ ] I tested my change in a Wasp app to verify that it works as intended.
 
-If you did code changes and **added a new feature**, make sure you satisfy the following:
+- 🧪 Tests and apps:
 
-1. [ ] I updated [`waspc/examples/todoApp`](https://github.com/wasp-lang/wasp/tree/main/waspc/examples/todoApp) and its e2e tests as needed and manually checked it works correctly.
+  - [ ] I added **unit tests** for my change. <!-- If not, explain why. -->
+  - [ ] _(if you fixed a bug)_ I added a **regression test** for the bug I fixed. <!-- If not, explain why. -->
+  - [ ] _(if you added/updated a feature)_ I added/updated **e2e tests** in `examples/kitchen-sink/e2e-tests`.
+  - [ ] _(if you added/updated a feature)_ I updated the **starter templates** in `waspc/data/Cli/templates`, as needed.
+  - [ ] _(if you added/updated a feature)_ I updated the **example apps** in `examples/`, as needed.
+    - [ ] _(if you updated `examples/tutorials`)_ I updated the tutorial in the docs (and vice versa).
 
-If you did code changes and **updated an existing feature**, make sure you satisfy the following:
+- 📜 Documentation:
 
-1. [ ] I updated [`waspc/examples/todoApp`](https://github.com/wasp-lang/wasp/tree/main/waspc/examples/todoApp) and its e2e tests as needed and manually checked it works correctly.
+  - [ ] _(if you added/updated a feature)_ I **added/updated the documentation** in `web/docs/`.
 
-### Update starter apps if needed
+- 🆕 Changelog: _(if change is more than just code/docs improvement)_
+  - [ ] I updated `waspc/ChangeLog.md` with a **user-friendly** description of the change.
+  - [ ] _(if you did a breaking change)_ I added a step to the current **migration guide** in `web/docs/migration-guides/`.
+  - [ ] I **bumped the `version`** in `waspc/waspc.cabal` to reflect the changes I introduced.
 
-If you did code changes and **updated an existing feature**, make sure you satisfy the following:
+<!--
+  Bumping the version on `waspc/waspc.cabal`:
 
-1. [ ] I updated [starter skeleton](https://github.com/wasp-lang/wasp/tree/main/waspc/data/Cli/templates/skeleton) as needed and manually checked it works correctly.
-2. [ ] I updated [`basic` starter](https://github.com/wasp-lang/wasp/tree/main/waspc/data/Cli/templates/basic) as needed and manually checked it works correctly.
-3. [ ] I updated [`todo-ts` starter](https://github.com/wasp-lang/starters/tree/dev/todo-ts) as needed and manually checked it works correctly.
-4. [ ] I updated [`embeddings` starter](https://github.com/wasp-lang/starters/tree/dev/embeddings) as needed and manually checked it works correctly.
-5. [ ] I updated [`saas` starter](https://github.com/wasp-lang/open-saas/tree/main/template) as needed and manually checked it works correctly.
+  We still haven't reached 1.0, so the version bumping follows these rules:
+    - Bug fix:            0.X.+1    (e.g. 0.16.3 bumps to 0.16.4)
+    - New feature:        0.X.+1    (e.g. 0.16.3 bumps to 0.16.4)
+    - Breaking change:    0.+1.0    (e.g. 0.16.3 bumps to 0.17.0)
 
-### Update e2e tests if needed
-
-If you did code changes and changed Wasp's code generation logic, make sure you satisfy the following:
-
-1. [] I updated [e2e tests](https://github.com/wasp-lang/wasp/tree/main/waspc#end-to-end-e2e-tests) as needed and manually checked they are correct.
+  If the version has already been bumped on `main` since the last release, skip this.
+-->

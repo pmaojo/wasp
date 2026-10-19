@@ -1,17 +1,19 @@
-import { useContext } from 'react'
+import { useAuthContext } from '@wasp.sh/lib-auth/browser'
 import { useForm } from 'react-hook-form'
+import { useLocation } from 'react-router'
+
 import { resetPassword } from '../../../email/actions/passwordReset.js'
-import { useLocation } from 'react-router-dom'
-import { Form, FormItemGroup, FormLabel, FormInput, SubmitButton, FormError } from '../Form'
-import { AuthContext } from '../../Auth'
+import { Form, FormItemGroup, FormLabel, FormInput, SubmitButton, FormError, getAuthErrorMessage } from '@wasp.sh/lib-sdk-core/browser'
+
+type ResetPasswordFormFields = { password: string; passwordConfirmation: string };
 
 // PRIVATE API
 export const ResetPasswordForm = () => {
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<{ password: string; passwordConfirmation: string }>()
-  const { isLoading, setErrorMessage, setSuccessMessage, setIsLoading } = useContext(AuthContext)
+  const { register, handleSubmit, reset, formState: { errors } } = useForm<ResetPasswordFormFields>()
+  const { isLoading, setErrorMessage, setSuccessMessage, setIsLoading } = useAuthContext()
   const location = useLocation()
   const token = new URLSearchParams(location.search).get('token')
-  const onSubmit = async (data) => {
+  const onSubmit = async (data: ResetPasswordFormFields): Promise<void> => {
     if (!token) {
       setErrorMessage({
         title:
@@ -32,11 +34,8 @@ export const ResetPasswordForm = () => {
       await resetPassword({ password: data.password, token })
       reset()
       setSuccessMessage('Your password has been reset.')
-    } catch (error) {
-      setErrorMessage({
-        title: error.message,
-        description: error.data?.data?.message,
-      })
+    } catch (error: unknown) {
+      setErrorMessage(getAuthErrorMessage(error));
     } finally {
       setIsLoading(false)
     }

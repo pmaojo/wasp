@@ -30,6 +30,7 @@ import Wasp.Generator.Monad (Generator)
 import qualified Wasp.Generator.ServerGenerator.Common as C
 import Wasp.Generator.ServerGenerator.JsImport (extImportToImportJson)
 import Wasp.Util ((<++>))
+import Wasp.Util.Js (makeJsStringLiteral)
 
 genEmailAuth :: AS.AppSpec -> AS.Auth.Auth -> Generator [FileDraft]
 genEmailAuth spec auth = case emailAuth of
@@ -53,8 +54,8 @@ genEmailAuthConfig spec emailAuthConfig = return $ C.mkTmplFdWithDstAndData tmpl
         [ "providerId" .= Email.providerId emailAuthProvider,
           "displayName" .= Email.displayName emailAuthProvider,
           "fromField" .= fromFieldJson,
-          "emailVerificationClientRoute" .= emailVerificationClientRoute,
-          "passwordResetClientRoute" .= passwordResetClientRoute,
+          "emailVerificationClientRoute" .= makeJsStringLiteral emailVerificationClientRoute,
+          "passwordResetClientRoute" .= makeJsStringLiteral passwordResetClientRoute,
           "getPasswordResetEmailContent" .= getPasswordResetEmailContent,
           "getVerificationEmailContent" .= getVerificationEmailContent,
           "userSignupFields" .= extImportToImportJson relPathToServerSrcDir maybeUserSignupFields,
@@ -63,15 +64,15 @@ genEmailAuthConfig spec emailAuthConfig = return $ C.mkTmplFdWithDstAndData tmpl
 
     fromFieldJson =
       object
-        [ "name" .= fromMaybe "" maybeName,
-          "email" .= email
+        [ "name" .= makeJsStringLiteral (fromMaybe "" maybeName),
+          "email" .= makeJsStringLiteral email
         ]
 
     fromField = AS.Auth.fromField emailAuthConfig
     maybeName = AS.EmailSender.name fromField
     email = AS.EmailSender.email fromField
 
-    isDevelopment = not $ AS.isBuild spec
+    isDevelopment = AS.isDevelopment spec
 
     emailVerificationClientRoute = getRoutePathFromRef spec $ AS.Auth.EmailVerification.clientRoute emailVerification
     passwordResetClientRoute = getRoutePathFromRef spec $ AS.Auth.PasswordReset.clientRoute passwordReset

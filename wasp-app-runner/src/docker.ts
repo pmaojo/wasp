@@ -1,14 +1,27 @@
 import { createHash } from "crypto";
-import type { PathToApp } from "./args.js";
+import type { DockerImageName, PathToApp } from "./args.js";
+import { createLogger } from "./logging.js";
+import { spawnWithLog } from "./process.js";
 import { Branded } from "./types.js";
 import type { AppName } from "./waspCli.js";
 
 export type DbContainerName = Branded<string, "ContainerName">;
-export type ServerBuildContainerName = Branded<
-  string,
-  "ServerBuildContainerName"
->;
-export type ServerBuildImageName = Branded<string, "ServerBuildImageName">;
+
+const pullLogger = createLogger("docker-pull");
+
+export async function pullDockerImage(image: DockerImageName): Promise<void> {
+  pullLogger.info(`Pulling Docker image: ${image}...`);
+  try {
+    await spawnWithLog({
+      name: "docker-pull",
+      cmd: "docker",
+      args: ["pull", image],
+    });
+  } catch {
+    pullLogger.error(`Failed to pull Docker image: ${image}`);
+    process.exit(1);
+  }
+}
 
 export function createAppSpecificDbContainerName({
   appName,
@@ -22,26 +35,6 @@ export function createAppSpecificDbContainerName({
     pathToApp,
   });
   return `${prefix}-db` as DbContainerName;
-}
-
-export function createAppSpecificServerBuildDockerNames({
-  appName,
-  pathToApp,
-}: {
-  appName: AppName;
-  pathToApp: PathToApp;
-}): {
-  imageName: ServerBuildImageName;
-  containerName: ServerBuildContainerName;
-} {
-  const prefix = createAppSpecificPrefix({
-    appName,
-    pathToApp,
-  });
-  return {
-    imageName: `${prefix}-server` as ServerBuildImageName,
-    containerName: `${prefix}-server-container` as ServerBuildContainerName,
-  };
 }
 
 function createAppSpecificPrefix({

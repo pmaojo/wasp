@@ -26,7 +26,7 @@ import Wasp.Generator.FileDraft (FileDraft)
 import Wasp.Generator.Monad (Generator)
 import Wasp.Generator.SdkGenerator.Server.JobGenerator
   ( getImportJsonForJobDefinition,
-    getJobExecutorImportPath,
+    getJobExecutorSdkPackageImportPath,
   )
 import Wasp.Generator.ServerGenerator.Common
   ( ServerTemplatesDir,
@@ -40,25 +40,26 @@ genJobs spec = case getJobs spec of
   [] -> return []
   jobs -> return $ genAllJobImports spec : (genRegisterJob <$> jobs)
 
-genRegisterJob :: (String, Job) -> FileDraft
-genRegisterJob (jobName, job) =
+genRegisterJob :: Job -> FileDraft
+genRegisterJob job =
   C.mkTmplFdWithDstAndData
     tmplFile
     dstFile
     ( Just $
         object
           [ "jobPerformFn" .= jobPerformFn,
-            "jobExecutorImportPath" .= SP.fromRelFileP (getJobExecutorImportPath (J.executor job)),
-            "jobDefinition" .= getImportJsonForJobDefinition jobName
+            "jobExecutorImportPath" .= SP.fromRelFileP (getJobExecutorSdkPackageImportPath (J.executor job)),
+            "jobDefinition" .= getImportJsonForJobDefinition job.name
           ]
     )
   where
     tmplFile = C.asTmplFile $ jobsDirInServerTemplatesDir </> [relfile|_job.ts|]
-    dstFile = jobsDirInServerRootDir </> fromJust (SP.parseRelFile $ jobName ++ ".ts")
+    dstFile = jobsDirInServerRootDir </> fromJust (SP.parseRelFile $ job.name ++ ".ts")
 
     jobPerformFn =
-      SJI.extImportToImportJson relPathFromJobsDirToServerSrcDir $
-        Just $ (J.fn . J.perform) job
+      SJI.extImportToImportJson relPathFromJobsDirToServerSrcDir
+        $ Just
+        $ (J.fn . J.perform) job
 
     relPathFromJobsDirToServerSrcDir :: Path Posix (Rel importLocation) (Dir C.ServerSrcDir)
     relPathFromJobsDirToServerSrcDir = [reldirP|../|]
@@ -74,11 +75,11 @@ genAllJobImports spec =
         dstFile
         ( Just $
             object
-              ["jobs" .= (buildJobInfo <$> (fst <$> getJobs spec))]
+              ["jobs" .= (buildJobInfo <$> getJobs spec)]
         )
   where
-    buildJobInfo :: String -> Aeson.Value
-    buildJobInfo jobName = object ["name" .= jobName]
+    buildJobInfo :: Job -> Aeson.Value
+    buildJobInfo job = object ["name" .= job.name]
 
 data JobsDir
 

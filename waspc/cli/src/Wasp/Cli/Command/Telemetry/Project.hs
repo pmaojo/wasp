@@ -4,9 +4,7 @@ module Wasp.Cli.Command.Telemetry.Project
   ( getWaspProjectPathHash,
     considerSendingData,
     readProjectTelemetryCacheFile,
-    getTimeOfLastTelemetryDataSent,
-    -- NOTE: for testing only
-    checkIfEnvValueIsTruthy,
+    getTimeOfLastTelemetryDataSendAttempt,
   )
 where
 
@@ -17,7 +15,6 @@ import Data.Aeson ((.=))
 import qualified Data.Aeson as Aeson
 import qualified Data.ByteString.Lazy.UTF8 as ByteStringLazyUTF8
 import qualified Data.ByteString.UTF8 as ByteStringUTF8
-import Data.Char (toLower)
 import Data.Functor ((<&>))
 import Data.List (intercalate, intersect)
 import Data.Maybe (fromJust, fromMaybe)
@@ -31,50 +28,49 @@ import qualified StrongPath as SP
 import qualified System.Environment as ENV
 import qualified System.IO as SIO
 import qualified System.Info
-import Wasp.Cli.Command (Command)
+import Wasp.Cli.Command (Command, require)
 import qualified Wasp.Cli.Command.Call as Command.Call
-import Wasp.Cli.Command.Require (InWaspProject (InWaspProject), require)
+import Wasp.Cli.Command.Require.InWaspProject (InWaspProject (InWaspProject))
 import Wasp.Cli.Command.Telemetry.Common (TelemetryCacheDir)
 import Wasp.Cli.Command.Telemetry.User (UserSignature (..))
-import Wasp.Util (ifM)
+import Wasp.Util (checkIfOnCi, ifM, isOlderThanNHours)
 import qualified Wasp.Util.IO as IOUtil
 
 considerSendingData :: Path' Abs (Dir TelemetryCacheDir) -> UserSignature -> ProjectHash -> Command.Call.Call -> IO ()
 considerSendingData telemetryCacheDirPath userSignature projectHash cmdCall = do
   projectCache <- readOrCreateProjectTelemetryFile telemetryCacheDirPath projectHash
 
-  let relevantLastCheckIn = case cmdCall of
-        Command.Call.Build -> _lastCheckInBuild projectCache
-        Command.Call.Deploy _ -> _lastCheckInDeploy projectCache
-        _ -> _lastCheckIn projectCache
+  let relevantLastSendAttempt = case cmdCall of
+        Command.Call.Build -> _lastSendAttemptBuild projectCache
+        Command.Call.Deploy _ -> _lastSendAttemptDeploy projectCache
+        _ -> _lastSendAttempt projectCache
 
-  shouldSendData <- case relevantLastCheckIn of
+  shouldSendData <- case relevantLastSendAttempt of
     Nothing -> return True
-    Just lastCheckIn -> isOlderThan12Hours lastCheckIn
+    Just lastSendAttempt -> isOlderThanNHours 12 lastSendAttempt
 
   when shouldSendData $ do
-    telemetryContext <- getTelemetryContext
-    sendTelemetryData $ getProjectTelemetryData userSignature projectHash cmdCall telemetryContext
+    -- NOTE: We record the send attempt on disk *before* actually sending the data.
+    --   If we did it after, a slow or failed request (e.g. PostHog being down, or the CLI
+    --   aborting the telemetry thread because the main command finished) would leave the
+    --   cache unchanged, and we would keep attempting to send on every invocation.
     projectCache' <- newProjectCache projectCache
     writeProjectTelemetryFile telemetryCacheDirPath projectHash projectCache'
+    telemetryContext <- getTelemetryContext
+    sendTelemetryData $ getProjectTelemetryData userSignature projectHash cmdCall telemetryContext
   where
-    isOlderThan12Hours :: T.UTCTime -> IO Bool
-    isOlderThan12Hours time = do
-      now <- T.getCurrentTime
-      let secondsSinceLastCheckIn = T.nominalDiffTimeToSeconds (now `T.diffUTCTime` time)
-      return $
-        let numSecondsInHour = 3600
-         in secondsSinceLastCheckIn > 12 * numSecondsInHour
-
     newProjectCache :: ProjectTelemetryCache -> IO ProjectTelemetryCache
     newProjectCache currentProjectCache = do
       now <- T.getCurrentTime
       return
         currentProjectCache
-          { _lastCheckIn = Just now,
-            _lastCheckInBuild = case cmdCall of
+          { _lastSendAttempt = Just now,
+            _lastSendAttemptBuild = case cmdCall of
               Command.Call.Build -> Just now
-              _ -> _lastCheckInBuild currentProjectCache
+              _ -> _lastSendAttemptBuild currentProjectCache,
+            _lastSendAttemptDeploy = case cmdCall of
+              Command.Call.Deploy _ -> Just now
+              _ -> _lastSendAttemptDeploy currentProjectCache
           }
 
 getTelemetryContext :: IO String
@@ -89,31 +85,6 @@ getTelemetryContext = do
         (SIO.hIsTerminalDevice SIO.stdout `catchError` const (return True))
           <&> \case True -> ""; False -> "NON_INTERACTIVE_SHELL"
       ]
-  where
-    -- This function was inspired by https://github.com/watson/ci-info/blob/master/index.js .
-    -- We also replicate this logic in our wasp installer script (installer.sh in get-wasp-sh repo).
-    checkIfOnCi :: IO Bool
-    checkIfOnCi =
-      any checkIfEnvValueIsTruthy
-        <$> mapM
-          ENV.lookupEnv
-          [ "BUILD_ID", -- Jenkins, Codeship
-            "BUILD_NUMBER", -- Jenkins, TeamCity
-            "CI", -- Github actions, Travis CI, CircleCI, Cirrus CI, Gitlab CI, Appveyor, Codeship, dsari
-            "CI_APP_ID", -- Appflow
-            "CI_BUILD_ID", -- Appflow
-            "CI_BUILD_NUMBER", -- Appflow
-            "CI_NAME", -- Codeship and others
-            "CONTINUOUS_INTEGRATION", -- Travis CI, Cirrus CI
-            "RUN_ID" -- TaskCluster, dsari
-          ]
-
-checkIfEnvValueIsTruthy :: Maybe String -> Bool
-checkIfEnvValueIsTruthy Nothing = False
-checkIfEnvValueIsTruthy (Just v)
-  | null v = False
-  | (toLower <$> v) == "false" = False
-  | otherwise = True
 
 -- * Project hash.
 
@@ -130,9 +101,12 @@ getWaspProjectPathHash = do
 -- * Project telemetry cache.
 
 data ProjectTelemetryCache = ProjectTelemetryCache
-  { _lastCheckIn :: Maybe T.UTCTime, -- Last time when CLI was called for this project, any command.
-    _lastCheckInBuild :: Maybe T.UTCTime, -- Last time when CLI was called for this project, with Build command.
-    _lastCheckInDeploy :: Maybe T.UTCTime -- Last time when CLI was called for this project, with Deploy command.
+  { -- Last time we attempted to send telemetry data for this project, for any command.
+    _lastSendAttempt :: Maybe T.UTCTime,
+    -- Last time we attempted to send telemetry data for this project, for the Build command.
+    _lastSendAttemptBuild :: Maybe T.UTCTime,
+    -- Last time we attempted to send telemetry data for this project, for the Deploy command.
+    _lastSendAttemptDeploy :: Maybe T.UTCTime
   }
   deriving (Generic, Show)
 
@@ -141,12 +115,13 @@ instance Aeson.ToJSON ProjectTelemetryCache
 instance Aeson.FromJSON ProjectTelemetryCache
 
 initialCache :: ProjectTelemetryCache
-initialCache = ProjectTelemetryCache {_lastCheckIn = Nothing, _lastCheckInBuild = Nothing, _lastCheckInDeploy = Nothing}
+initialCache = ProjectTelemetryCache {_lastSendAttempt = Nothing, _lastSendAttemptBuild = Nothing, _lastSendAttemptDeploy = Nothing}
 
 -- * Project telemetry cache file.
 
-getTimeOfLastTelemetryDataSent :: ProjectTelemetryCache -> Maybe T.UTCTime
-getTimeOfLastTelemetryDataSent cache = maximum [_lastCheckIn cache, _lastCheckInBuild cache]
+getTimeOfLastTelemetryDataSendAttempt :: ProjectTelemetryCache -> Maybe T.UTCTime
+getTimeOfLastTelemetryDataSendAttempt cache =
+  maximum [_lastSendAttempt cache, _lastSendAttemptBuild cache, _lastSendAttemptDeploy cache]
 
 readProjectTelemetryCacheFile :: Path' Abs (Dir TelemetryCacheDir) -> ProjectHash -> IO (Maybe ProjectTelemetryCache)
 readProjectTelemetryCacheFile telemetryCacheDirPath projectHash =
@@ -182,6 +157,7 @@ data ProjectTelemetryData = ProjectTelemetryData
     _projectHash :: ProjectHash,
     _waspVersion :: String,
     _os :: String,
+    _arch :: String,
     _isBuild :: Bool,
     _deployCmdArgs :: String,
     _context :: String
@@ -195,6 +171,7 @@ getProjectTelemetryData userSignature projectHash cmdCall context =
       _projectHash = projectHash,
       _waspVersion = showVersion version,
       _os = System.Info.os,
+      _arch = System.Info.arch,
       _isBuild = case cmdCall of
         Command.Call.Build -> True
         _ -> False,
@@ -226,6 +203,7 @@ sendTelemetryData telemetryData = do
                   "project_hash" .= _projectHashValue (_projectHash telemetryData),
                   "wasp_version" .= _waspVersion telemetryData,
                   "os" .= _os telemetryData,
+                  "arch" .= _arch telemetryData,
                   "is_build" .= _isBuild telemetryData,
                   "deploy_cmd_args" .= _deployCmdArgs telemetryData,
                   "context" .= _context telemetryData

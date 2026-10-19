@@ -1,6 +1,4 @@
----
-title: CI/CD Scenarios
----
+# CI & CD
 
 Setting up a CI/CD pipeline is an optional but highly recommended part of deploying applications.
 
@@ -61,7 +59,7 @@ We'll show you how to run end-to-end tests in CI using the [Github Actions](http
 
 Unit tests test pieces of your code logic in isolation. They are much simpler and faster than e2e tests, but they don't simulate the real user interaction with your app.
 
-You can use Wasp's built in [client tests](../project/testing.md) support to test the client side code of your app. You are free to use any testing framework for the server side code.
+You can use Wasp's built in [client tests](../advanced/testing.md) support to test the client side code of your app. You are free to use any testing framework for the server side code.
 
 **You'd run the unit tests in the CI** in a similar way as the e2e tests:
 
@@ -83,7 +81,7 @@ The most common way to package your app for deployment is using Docker images. T
 **To build the app as a Docker image**, you'll need to:
 
 1. Install Docker in the CD environment.
-2. Build the app with `wasp build`.
+2. Install dependencies with `wasp install` and build the app with `wasp build`.
 3. Build the Docker image and push it to a Docker registry:
    - for our server app
    - for our client app
@@ -97,7 +95,7 @@ Docker Registry is a place where you can store your Docker images and then your 
 
 #### Example deployment
 
-We'll take a look at our Coolify deployment example in the [deployment](./deployment-methods/self-hosted.md#coolify) section. We are using Github Actions to build the Docker images and their Github Container Registry (GHCR) to store them.
+We'll take a look at our Coolify deployment example in the [deployment](../guides/deployment/self-hosted/coolify.md) section. We are using Github Actions to build the Docker images and their Github Container Registry (GHCR) to store them.
 
 Let's go through the [deploy.yml](https://gist.github.com/infomiho/ad6fade7396498ae32a931ca563a4524#file-deploy-yml) file in the Coolify guide:
 
@@ -109,13 +107,13 @@ Let's go through the [deploy.yml](https://gist.github.com/infomiho/ad6fade739649
 
    We are using the `docker/metadata-action` action to prepare some extra info that we'll use later in the deployment process.
 
-3. Next, we **build the Wasp app** with `wasp build`.
+3. Next, we **install dependencies** with `wasp install` and **build the Wasp app** with `wasp build`.
 
-   This gives our server and the client app in the `.wasp/build` folder.
+   This creates our server and the client app in the `.wasp/out` folder.
 
 4. Then, we **package the server app** into a Docker image and **push it to the GHCR**.
 
-   We use the `Dockerfile` in the `.wasp/build` directory to build and push the server Docker image using the `docker/build-push-action` action.
+   We use the `Dockerfile` in the `.wasp/out` directory to build and push the server Docker image using the `docker/build-push-action` action.
 
 5. Next, we create a `Dockerfile` for our client and then **package the client app** into a Docker image and **push it to the GHCR**.
 
@@ -131,10 +129,10 @@ Wasp's client app is a single page application (SPA) which you build into static
 
 **To deploy the client app as static files**, you'll need to:
 
-1. Build the app with `wasp build` in the CD environment.
-2. Build the client app with `npm run build`.
-3. Upload the static files to your hosting provider.
+1. Install dependencies with `wasp install` and build the app with `wasp build` in the CD environment.
+2. Build the client app with `npx vite build`.
+3. Upload the static files (from `.wasp/out/web-app/build`) to your hosting provider.
 
-<!-- TOOD: update links below -->
+<!-- TODO: update links below -->
 
-Check out our instructions for deploying the client app to [Netlify](./deployment-methods/paas.md#netlify) or [Cloudflare](./deployment-methods/paas.md#cloudflare) where you can check out the example deployment using Github Actions.
+Check out our instructions for deploying the client app to [Netlify](../guides/deployment/cloud-providers/netlify.md) or [Cloudflare](../guides/deployment/cloud-providers/cloudflare.md) where you can check out the example deployment using Github Actions.

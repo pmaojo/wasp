@@ -1,15 +1,17 @@
-import { useContext } from 'react'
+import { useAuthContext } from '@wasp.sh/lib-auth/browser'
 import { useForm } from 'react-hook-form'
+
 import { requestPasswordReset } from '../../../email/actions/passwordReset.js'
-import { Form, FormItemGroup, FormLabel, FormInput, SubmitButton, FormError } from '../Form'
-import { AuthContext } from '../../Auth'
+import { Form, FormItemGroup, FormLabel, FormInput, SubmitButton, FormError, emailFieldRules, emailInputProps, getAuthErrorMessage } from '@wasp.sh/lib-sdk-core/browser'
+
+type ForgotPasswordFormFields = { email: string };
 
 // PRIVATE API
 export const ForgotPasswordForm = () => {
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<{ email: string }>()
-  const { isLoading, setErrorMessage, setSuccessMessage, setIsLoading } = useContext(AuthContext)
+  const { register, handleSubmit, reset, formState: { errors } } = useForm<ForgotPasswordFormFields>()
+  const { isLoading, setErrorMessage, setSuccessMessage, setIsLoading } = useAuthContext()
 
-  const onSubmit = async (data) => {
+  const onSubmit = async (data: ForgotPasswordFormFields): Promise<void> => {
     setIsLoading(true)
     setErrorMessage(null)
     setSuccessMessage(null)
@@ -17,11 +19,8 @@ export const ForgotPasswordForm = () => {
       await requestPasswordReset(data)
       reset()
       setSuccessMessage('Check your email for a password reset link.')
-    } catch (error) {
-      setErrorMessage({
-        title: error.message,
-        description: error.data?.data?.message,
-      })
+    } catch (error: unknown) {
+      setErrorMessage(getAuthErrorMessage(error));
     } finally {
       setIsLoading(false)
     }
@@ -33,10 +32,8 @@ export const ForgotPasswordForm = () => {
         <FormItemGroup>
           <FormLabel>E-mail</FormLabel>
           <FormInput
-            {...register('email', {
-              required: 'Email is required',
-            })}
-            type="email"
+            {...register('email', emailFieldRules)}
+            {...emailInputProps}
             disabled={isLoading}
           />
           {errors.email && <FormError>{errors.email.message}</FormError>}

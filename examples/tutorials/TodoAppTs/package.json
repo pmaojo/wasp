@@ -1,21 +1,29 @@
 {
   "name": "todo-app-ts",
   "type": "module",
+  "workspaces": [
+    ".wasp/out/*",
+    ".wasp/out/sdk/wasp"
+  ],
   "scripts": {
-    "test": "DEBUG=pw:webserver playwright test --config headless-tests/"
+    "test": "npm run test:install-deps && DEBUG=pw:webserver playwright test --config e2e-tests/",
+    "test:install-deps": "playwright install ${WASP_PLAYWRIGHT_INSTALL_FLAGS---with-deps}"
   },
   "dependencies": {
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "react-router-dom": "^6.26.2",
-    "wasp": "file:.wasp/out/sdk/wasp"
+    "react": "^19.2.1",
+    "react-dom": "^19.2.1",
+    "react-router": "^8.0.1"
   },
   "devDependencies": {
-    "@playwright/test": "1.51.1",
-    "@types/react": "^18.0.37",
-    "@wasp.sh/wasp-app-runner": "^0.0.7",
+    "@playwright/test": "1.55.1",
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "@wasp.sh/spec": "file:.wasp/spec",
+    "@wasp.sh/wasp-app-runner": "^0.0.18",
     "prisma": "5.19.1",
-    "typescript": "5.8.2",
-    "vite": "^4.3.9"
+    "typescript": "6.0.3",
+    "vite": "^8.1.0",
+    "vitest": "^4.1.9"
   }
 }

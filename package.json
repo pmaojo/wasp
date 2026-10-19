@@ -1,15 +1,18 @@
 {
   "name": "wasp-repo",
+  "type": "module",
   "scripts": {
-    "prettier:check": "prettier --ignore-unknown --check --config .prettierrc .",
-    "prettier:format": "prettier --ignore-unknown --write --config .prettierrc ."
+    "check:prettier": "prettier --ignore-unknown --check --config prettier.config.mjs .",
+    "format:check": "npm run check:prettier",
+    "format:prettier": "prettier --ignore-unknown --write --config prettier.config.mjs .",
+    "format:write": "npm run format:prettier"
   },
   "devDependencies": {
     "prettier": "3.5.3",
     "prettier-plugin-organize-imports": "4.1.0",
     "prettier-plugin-pkg": "0.19.1",
     "prettier-plugin-sh": "0.17.4",
-    "prettier-plugin-tailwindcss": "^0.6.13",
-    "typescript": "~5.8.3"
+    "prettier-plugin-tailwindcss": "0.7.2",
+    "typescript": "~6.0.3"
   }
 }

@@ -3,7 +3,7 @@
 #   Because if not, we had situations where it would use the different version
 #   locally and on Github CI. This way we ensure exact version is used,
 #   and also have control over updating it (instead of update surprising us).
-FROM node:{= nodeVersion =}-alpine3.17 AS node
+FROM node:{= nodeVersion =}-alpine3.23 AS node
 
 
 # We split Dockerfile into base, server-builder and server-production.
@@ -16,6 +16,10 @@ FROM node:{= nodeVersion =}-alpine3.17 AS node
 
 FROM node AS base
 RUN apk --no-cache -U upgrade # To ensure any potential security patches are applied.
+# Alpine 3.21+ no longer includes openssl as a transitive dependency of the
+# Node.js image. Prisma's native engine needs libssl at both build and runtime.
+# TODO: Revisit once we upgrade to Prisma 6 (https://github.com/wasp-lang/wasp/issues/2504).
+RUN apk add --no-cache openssl
 
 
 # Todo: The 'server-builder' image stays on disk under <none>:<none> and is
@@ -27,23 +31,29 @@ FROM base AS server-builder
 # `python3` fixes the issue.
 RUN apk add --no-cache python3 build-base libtool autoconf automake
 WORKDIR /app
-# Since the framwork code in /.wasp/build/server imports the user code in /src
+# Since the framwork code in /.wasp/out/server imports the user code in /src
 # using relative imports, we must mirror the same directory structure in the
 # Docker image.
 COPY src ./src
 COPY package.json .
 COPY package-lock.json .
 COPY tsconfig*.json .
-COPY server .wasp/build/server
+COPY server .wasp/out/server
 COPY sdk .wasp/out/sdk
+COPY types .wasp/out/types
+COPY libs .wasp/out/libs
 # Install npm packages, resulting in node_modules/.
-RUN npm install && cd .wasp/build/server && npm install
+RUN npm install && cd .wasp/out/server && npm install
 {=# usingPrisma =}
-COPY db/schema.prisma .wasp/build/db/
-RUN cd .wasp/build/server && npx prisma generate --schema='{= dbSchemaFileFromServerDir =}'
+COPY db/schema.prisma .wasp/out/db/
+RUN cd .wasp/out/server && npx prisma generate --schema='{= dbSchemaFileFromServerDir =}'
 {=/ usingPrisma =}
 # Building the server should come after Prisma generation.
-RUN cd .wasp/build/server && npm run build
+RUN cd .wasp/out/server && npm run bundle
+
+# Depending on `npm`'s dependency resolution, this folder may or may not exist.
+# We ensure they are created so that the COPY instruction later does not fail.
+RUN mkdir -p ./.wasp/out/server/node_modules
 
 
 # TODO: Use pm2?
@@ -59,12 +69,12 @@ COPY --from=server-builder /app/node_modules ./node_modules
 # Copying 'server/node_modules' because we require dotenv package to
 # load environment variables
 # TODO: replace dotenv with native Node.js environment variable loading
-COPY --from=server-builder /app/.wasp/build/server/node_modules .wasp/build/server/node_modules
-COPY --from=server-builder /app/.wasp/build/server/bundle .wasp/build/server/bundle
-COPY --from=server-builder /app/.wasp/build/server/package*.json .wasp/build/server/
-COPY db/ .wasp/build/db/
+COPY --from=server-builder /app/.wasp/out/server/node_modules .wasp/out/server/node_modules
+COPY --from=server-builder /app/.wasp/out/server/bundle .wasp/out/server/bundle
+COPY --from=server-builder /app/.wasp/out/server/package*.json .wasp/out/server/
+COPY db/ .wasp/out/db/
 EXPOSE ${PORT}
-WORKDIR /app/.wasp/build/server
+WORKDIR /app/.wasp/out/server
 ENTRYPOINT ["npm", "run", "start-production"]
 
 

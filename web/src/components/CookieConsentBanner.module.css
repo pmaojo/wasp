@@ -1,0 +1,86 @@
+.container {
+  --banner-background: var(--ifm-background-color);
+  --banner-border: var(--ifm-color-emphasis-300);
+  --banner-text: var(--ifm-font-color-base);
+  --banner-link: var(--ifm-link-color);
+  --banner-hover: var(--ifm-color-emphasis-100);
+
+  z-index: 1000;
+  background: var(--banner-background);
+  border: 1px solid var(--banner-border);
+  border-radius: var(--custom-border-radius-md);
+  padding: 16px;
+  box-shadow: var(--custom-shadow-lw);
+  position: fixed;
+  left: 10px;
+  bottom: 10px;
+  right: 10px;
+  width: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+:global(:root:has(.twLandingPage)) .container {
+  --banner-background: var(--wasp-bg);
+  --banner-border: var(--wasp-g2);
+  --banner-text: var(--wasp-g7);
+  --banner-link: var(--wasp-k);
+  --banner-hover: var(--wasp-g1);
+}
+
+@media (min-width: 40rem) {
+  .container {
+    max-width: 380px;
+    right: 20px;
+    bottom: 20px;
+    left: auto;
+  }
+}
+
+.content {
+  color: var(--banner-text);
+  font-size: 14px;
+  margin: 0 0 12px 0;
+}
+
+.content a {
+  color: var(--banner-link);
+  text-decoration: underline;
+}
+
+.buttonWrapper {
+  display: flex;
+  gap: 10px;
+}
+
+.buttonAccept {
+  background: var(--ifm-color-primary);
+  color: var(--wasp-k);
+  font-size: 14px;
+  border-radius: var(--custom-border-radius);
+  padding: 10px 24px;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+  flex: 1;
+}
+
+.buttonAccept:hover {
+  opacity: 0.9;
+}
+
+.buttonDecline {
+  background: transparent;
+  border: 1px solid var(--banner-border);
+  color: var(--banner-text);
+  font-size: 14px;
+  border-radius: var(--custom-border-radius);
+  padding: 10px 24px;
+  cursor: pointer;
+  flex: 1;
+}
+
+.buttonDecline:hover {
+  background: var(--banner-hover);
+}

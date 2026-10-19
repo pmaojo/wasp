@@ -1,19 +1,19 @@
 {{={= =}=}}
-import { type Expand } from 'wasp/universal/types'
-import { type Request, type Response } from 'express'
-import {
-  type ParamsDictionary as ExpressParams,
-  type Query as ExpressQuery,
+import type { Expand } from '@wasp.sh/lib-sdk-core'
+import type { Request, Response } from 'express'
+import type {
+  ParamsDictionary as ExpressParams,
+  Query as ExpressQuery,
 } from 'express-serve-static-core'
-import { prisma } from 'wasp/server'
+import { prisma } from '../index.js'
 {=# isAuthEnabled =}
-import { type AuthUser } from 'wasp/auth'
+import type { AuthUser } from '../../auth/user.js'
 {=/ isAuthEnabled =}
-import { type _Entity } from './taggedEntities'
-import { type Payload } from 'wasp/core/serialization'
+import type { _Entity } from './taggedEntities'
+import type { Payload } from '../../core/serialization/index.js'
 
 export * from "./taggedEntities"
-export * from "wasp/core/serialization"
+export * from "../../core/serialization/index.js"
 
 export type UnauthenticatedQueryDefinition<
   Entities extends _Entity[],
@@ -100,6 +100,4 @@ type Context<Entities extends _Entity[]> = Expand<{
 type ContextWithUser<Entities extends _Entity[]> = Expand<
   Context<Entities> & { user?: AuthUser }
 >
-
-export type { ProviderName } from 'wasp/auth/utils'
 {=/ isAuthEnabled =}

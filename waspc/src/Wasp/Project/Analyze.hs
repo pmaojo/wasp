@@ -1,7 +1,6 @@
 module Wasp.Project.Analyze
   ( analyzeWaspProject,
     analyzePrismaSchema,
-    WaspFilePath (..),
   )
 where
 
@@ -20,25 +19,21 @@ import Wasp.AppSpec.Core.Decl.JSON ()
 import qualified Wasp.AppSpec.Valid as ASV
 import Wasp.CompileOptions (CompileOptions)
 import qualified Wasp.CompileOptions as CompileOptions
-import qualified Wasp.ConfigFile as CF
-import qualified Wasp.Generator.TailwindConfigFile as TCF
 import Wasp.Project.Common
   ( CompileError,
     CompileWarning,
     SrcTsConfigFile,
-    WaspFilePath (..),
     WaspProjectDir,
     findFileInWaspProjectDir,
-    getSrcTsConfigInWaspProjectDir,
     prismaSchemaFileInWaspProjectDir,
+    srcTsConfig,
+    tsConfigPaths,
   )
 import Wasp.Project.Db (makeDevDatabaseUrl)
 import Wasp.Project.Db.Migrations (findMigrationsDir)
 import Wasp.Project.Deployment (loadUserDockerfileContents)
 import Wasp.Project.Env (readDotEnvClient, readDotEnvServer)
 import qualified Wasp.Project.ExternalConfig as EC
-import qualified Wasp.Project.ExternalFiles as ExternalFiles
-import Wasp.Project.Vite (findCustomViteConfigPath)
 import Wasp.Project.WaspFile (analyzeWaspFile, findWaspFile)
 import qualified Wasp.Psl.Ast.Schema as Psl.Schema
 import qualified Wasp.Psl.Parser.Schema as Psl.Parser
@@ -61,21 +56,20 @@ analyzeWaspProject waspDir compileOptions = do
       analyzePrismaSchema waspDir >>= \case
         (Left prismaSchemaErrors, prismaSchemaWarnings) -> return (Left prismaSchemaErrors, prismaSchemaWarnings)
         -- NOTE: we are ignoring prismaSchemaWarnings if the schema was parsed successfully
-        (Right prismaSchemaAst, _) ->
-          analyzeWaspFile waspDir prismaSchemaAst waspFilePath >>= \case
-            Left errors -> return (Left errors, [])
-            Right declarations -> do
-              let srcTsConfigPath = getSrcTsConfigInWaspProjectDir waspFilePath
-              EC.readExternalConfigs waspDir srcTsConfigPath >>= \case
-                Left externalConfigError -> return (Left [externalConfigError], [])
-                Right externalConfigs ->
+        (Right prismaSchemaAst, _) -> do
+          EC.parseAndValidateExternalConfigs waspDir tsConfigPaths >>= \case
+            Left externalConfigErrors -> return (Left externalConfigErrors, [])
+            Right externalConfigs ->
+              analyzeWaspFile compileOptions prismaSchemaAst waspFilePath >>= \case
+                Left errors -> return (Left errors, [])
+                Right declarations ->
                   constructAppSpec
                     waspDir
                     compileOptions
                     externalConfigs
                     prismaSchemaAst
                     declarations
-                    srcTsConfigPath
+                    tsConfigPaths.srcTsConfig
 
 constructAppSpec ::
   Path' Abs (Dir WaspProjectDir) ->
@@ -86,36 +80,26 @@ constructAppSpec ::
   Path' (Rel WaspProjectDir) (File SrcTsConfigFile) ->
   IO (Either [CompileError] AS.AppSpec, [CompileWarning])
 constructAppSpec waspDir compileOptions externalConfigs parsedPrismaSchema decls srcTsConfigPath = do
-  externalCodeFiles <- ExternalFiles.readCodeFiles waspDir
-  externalPublicFiles <- ExternalFiles.readPublicFiles waspDir
-  customViteConfigPath <- findCustomViteConfigPath waspDir
-
   maybeMigrationsDir <- findMigrationsDir waspDir
   maybeUserDockerfileContents <- loadUserDockerfileContents waspDir
   let dbSystem = getValidDbSystemFromPrismaSchema parsedPrismaSchema
-  let devDbUrl = makeDevDatabaseUrl waspDir dbSystem decls
+  devDbUrl <- makeDevDatabaseUrl waspDir dbSystem decls
   serverEnvVars <- readDotEnvServer waspDir
   clientEnvVars <- readDotEnvClient waspDir
-  tailwindConfigFilesRelocators <- CF.discoverConfigFiles waspDir TCF.tailwindConfigRelocationMap
 
   let appSpec =
         AS.AppSpec
           { AS.decls = decls,
             AS.prismaSchema = parsedPrismaSchema,
             AS.waspProjectDir = waspDir,
-            AS.externalCodeFiles = externalCodeFiles,
-            AS.externalPublicFiles = externalPublicFiles,
             AS.migrationsDir = maybeMigrationsDir,
             AS.devEnvVarsServer = serverEnvVars,
             AS.devEnvVarsClient = clientEnvVars,
-            AS.isBuild = CompileOptions.isBuild compileOptions,
+            AS.buildType = CompileOptions.buildType compileOptions,
             AS.userDockerfileContents = maybeUserDockerfileContents,
             AS.devDatabaseUrl = devDbUrl,
-            AS.customViteConfigPath = customViteConfigPath,
             AS.packageJson = EC._packageJson externalConfigs,
-            AS.srcTsConfigPath = srcTsConfigPath,
-            AS.srcTsConfig = EC._srcTsConfig externalConfigs,
-            AS.tailwindConfigFilesRelocators = tailwindConfigFilesRelocators
+            AS.srcTsConfigPath = srcTsConfigPath
           }
 
   return $ runValidation ASV.validateAppSpec appSpec
@@ -128,7 +112,7 @@ analyzePrismaSchema waspProjectDir = do
 
       case Psl.Parser.parsePrismaSchema prismaSchemaContent of
         Left err ->
-          return (Left [couldntParsePrismaSchemaMessage ++ "\n\n" ++ show err], [])
+          return (Left [couldntParsePrismaSchemaMessage ++ "\n\n" ++ err], [])
         Right parsedPrismaSchema -> return $ runValidation PslV.validatePrismaSchema parsedPrismaSchema
     Nothing -> return (Left [couldntFindPrismaSchemaMessage], [])
   where

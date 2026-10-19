@@ -1,13 +1,12 @@
 module Wasp.Generator.Common
-  ( ProjectRootDir,
+  ( GeneratedAppDir,
     UniversalTemplatesDir,
     universalTemplatesDirInTemplatesDir,
     ServerRootDir,
-    WebAppRootDir,
-    AppComponentRootDir,
+    GeneratedAppComponentDir,
     DbRootDir,
     makeJsonWithEntityData,
-    GeneratedSrcDir,
+    GeneratedAppComponentSrcDir,
     makeJsArrayFromHaskellList,
     dropExtensionFromImportPath,
   )
@@ -23,32 +22,29 @@ import StrongPath.Types (Path')
 import System.FilePath (splitExtension)
 import Wasp.Generator.Templates (TemplatesDir)
 import Wasp.Util (toLowerFirst)
+import Wasp.Util.Js (makeJsStringLiteral)
 
--- | Directory where the whole web app project (client, server, ...) is generated.
-data ProjectRootDir
+-- | Directory where the whole web app project is generated.
+data GeneratedAppDir
+
+-- | Directory of a single web app project component in 'GeneratedAppDir'.
+class GeneratedAppComponentDir d
+
+-- | Directory of top-level @src/@ dir in 'GeneratedAppComponentDir'.
+class GeneratedAppComponentSrcDir d
+
+data ServerRootDir
+
+instance GeneratedAppComponentDir ServerRootDir
+
+data DbRootDir
+
+instance GeneratedAppComponentDir DbRootDir
 
 data UniversalTemplatesDir
 
 universalTemplatesDirInTemplatesDir :: Path' (Rel TemplatesDir) (Dir UniversalTemplatesDir)
 universalTemplatesDirInTemplatesDir = [reldir|universal|]
-
--- | Type representing top-level src/ dir in an app component (e.g. in web app or in server).
---   Examples: web-app/src/, server/src/, ... .
-class GeneratedSrcDir d
-
-class AppComponentRootDir d
-
-data ServerRootDir
-
-instance AppComponentRootDir ServerRootDir
-
-data WebAppRootDir
-
-instance AppComponentRootDir WebAppRootDir
-
-data DbRootDir
-
-instance AppComponentRootDir DbRootDir
 
 makeJsonWithEntityData :: String -> Aeson.Value
 makeJsonWithEntityData name =
@@ -67,9 +63,7 @@ makeJsonWithEntityData name =
     entityNameToPrismaIdentifier = toLowerFirst
 
 makeJsArrayFromHaskellList :: [String] -> String
-makeJsArrayFromHaskellList list = "[" ++ intercalate ", " listOfJsStrings ++ "]"
-  where
-    listOfJsStrings = map (\s -> "'" ++ s ++ "'") list
+makeJsArrayFromHaskellList list = "[" ++ intercalate ", " (map makeJsStringLiteral list) ++ "]"
 
 dropExtensionFromImportPath :: Path Posix (Rel r) (File f) -> Path Posix (Rel r) (File f)
 dropExtensionFromImportPath = fromJust . SP.parseRelFileP . dropExtension . SP.fromRelFileP

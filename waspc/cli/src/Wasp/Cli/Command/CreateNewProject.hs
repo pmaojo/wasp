@@ -4,65 +4,73 @@ module Wasp.Cli.Command.CreateNewProject
 where
 
 import Control.Monad.IO.Class (liftIO)
-import Data.Function ((&))
 import qualified StrongPath as SP
-import Wasp.Cli.Command (Command)
+import Wasp.Cli.Command (Command, require)
 import Wasp.Cli.Command.Call (Arguments)
 import qualified Wasp.Cli.Command.CreateNewProject.AI as AI
-import Wasp.Cli.Command.CreateNewProject.ArgumentsParser (parseNewProjectArgs, NewProjectArgs(..))
-import Wasp.AI.Provider (Provider(..))
-import qualified Wasp.Cli.Command.CreateNewProject.Common as Common
+import Wasp.Cli.Command.CreateNewProject.ArgumentsParser (newProjectArgsParser)
+import Wasp.Cli.Command.CreateNewProject.AvailableTemplates (availableStarterTemplates)
 import Wasp.Cli.Command.CreateNewProject.ProjectDescription
   ( NewProjectDescription (..),
+    getAbsWaspProjectDir,
     obtainNewProjectDescription,
   )
 import Wasp.Cli.Command.CreateNewProject.StarterTemplates
-  ( DirBasedTemplateMetadata (_path),
-    StarterTemplate (..),
-    getStarterTemplates,
+  ( StarterTemplate (..),
     getTemplateStartingInstructions,
   )
-import Wasp.Cli.Command.CreateNewProject.StarterTemplates.GhRepo (createProjectOnDiskFromGhRepoTemplate)
-import Wasp.Cli.Command.CreateNewProject.StarterTemplates.Local (createProjectOnDiskFromLocalTemplate)
+import Wasp.Cli.Command.CreateNewProject.StarterTemplates.Bundled (createProjectOnDiskFromBundledTemplate)
+import Wasp.Cli.Command.CreateNewProject.StarterTemplates.GhReleaseArchive (createProjectOnDiskFromGhReleaseArchiveTemplate)
+import Wasp.Cli.Command.Install (installIO)
 import Wasp.Cli.Command.Message (cliSendMessageC)
+import Wasp.Cli.Command.Require.ValidNodeAndNpm (ValidNodeAndNpm (ValidNodeAndNpm))
+import Wasp.Cli.Message (cliSendMessage)
+import Wasp.Cli.Util.Parser (withArguments)
+import Wasp.AI.Provider (Provider (OpenAI))
 import qualified Wasp.Message as Msg
+import Wasp.Project.Common (WaspProjectDir)
+import Wasp.Util.Terminal (styleCode)
 import qualified Wasp.Util.Terminal as Term
 
 -- | It receives all of the arguments that were passed to the `wasp new` command.
 createNewProject :: Arguments -> Command ()
-createNewProject args = do
-  newProjectArgs@NewProjectArgs{_provider = providerArg} <- parseNewProjectArgs args & either Common.throwProjectCreationError return
-  let starterTemplates = getStarterTemplates
+createNewProject = withArguments newProjectArgsParser $ \args -> do
+  ValidNodeAndNpm <- require
+  newProjectDescription <- obtainNewProjectDescription args availableStarterTemplates
 
-  newProjectDescription <- obtainNewProjectDescription newProjectArgs starterTemplates
-
-  let provider = maybe OpenAI (\p -> if p == "openai" then OpenAI else OpenAI) providerArg
-
-  createProjectOnDisk provider newProjectDescription
+  createProjectOnDisk newProjectDescription
+  -- TODO consider removing if we start doing `wasp install` automatically
+  liftIO $ installDepsForNewProject (getAbsWaspProjectDir newProjectDescription)
   liftIO $ printGettingStartedInstructionsForProject newProjectDescription
 
-createProjectOnDisk :: Provider -> NewProjectDescription -> Command ()
-createProjectOnDisk provider
-  NewProjectDescription
-    { _projectName = projectName,
-      _appName = appName,
-      _template = template,
-      _absWaspProjectDir = absWaspProjectDir
-    } = do
+createProjectOnDisk :: NewProjectDescription -> Command ()
+createProjectOnDisk
+  newProjectDescription@(NewProjectDescription {_template = template}) = do
     cliSendMessageC $ Msg.Start $ "Creating your project from the \"" ++ show template ++ "\" template..."
     case template of
-      GhRepoStarterTemplate ghRepoRef metadata ->
-        createProjectOnDiskFromGhRepoTemplate absWaspProjectDir projectName appName ghRepoRef $ _path metadata
-      LocalStarterTemplate metadata ->
-        liftIO $ createProjectOnDiskFromLocalTemplate absWaspProjectDir projectName appName $ _path metadata
-      AiGeneratedStarterTemplate ->
-        AI.createNewProjectInteractiveOnDisk provider absWaspProjectDir appName
+      GhRepoReleaseArchiveTemplate {repo = ghRepoRef, archiveName = archiveName', archivePath = archivePath'} ->
+        createProjectOnDiskFromGhReleaseArchiveTemplate newProjectDescription ghRepoRef archiveName' archivePath'
+      BundledStarterTemplate {bundledPath = bundledPath'} ->
+        liftIO $ createProjectOnDiskFromBundledTemplate newProjectDescription bundledPath'
+      AiGeneratedStarterTemplate {} ->
+        AI.createNewProjectInteractiveOnDisk OpenAI (getAbsWaspProjectDir newProjectDescription) (_appName newProjectDescription)
+
+installDepsForNewProject :: SP.Path' SP.Abs (SP.Dir WaspProjectDir) -> IO ()
+installDepsForNewProject absWaspProjectDir =
+  installIO absWaspProjectDir >>= \case
+    Right () -> return ()
+    Left _err ->
+      putStrLn
+        $ Term.applyStyles [Term.Yellow]
+        $ "Warning: The project was created, but dependency installation failed.\n"
+          ++ "Run "
+          ++ styleCode "wasp install"
+          ++ " in the project directory to install the dependencies."
 
 -- | This function assumes that the project dir was created inside the current working directory.
 printGettingStartedInstructionsForProject :: NewProjectDescription -> IO ()
 printGettingStartedInstructionsForProject projectDescription = do
-  let projectDirName = init . SP.toFilePath . SP.basename $ _absWaspProjectDir projectDescription
+  let projectDirName = init . SP.toFilePath . SP.basename $ _absTemplateOutputDir projectDescription
   let instructions = getTemplateStartingInstructions projectDirName $ _template projectDescription
-  putStrLn $ Term.applyStyles [Term.Green] $ "Created new Wasp app in ./" ++ projectDirName ++ " directory!"
-  putStrLn ""
+  cliSendMessage $ Msg.Success $ "Created a new Wasp app in `./" ++ projectDirName ++ "`."
   putStrLn instructions

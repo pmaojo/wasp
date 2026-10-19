@@ -1,39 +1,37 @@
 module Wasp.Project.ExternalConfig.TsConfig
-  ( readSrcTsConfigFile,
+  ( parseAndValidateTsConfigFile,
+    -- Exported only for testing
+    validateTsConfig,
   )
 where
 
-import Control.Arrow (left)
-import Control.Monad.Except (ExceptT (ExceptT), runExceptT)
-import qualified Data.ByteString.Lazy.UTF8 as BS
+import Control.Monad.Except (ExceptT (..), liftEither, runExceptT, withExceptT)
 import Data.Either.Extra (maybeToEither)
-import StrongPath (Abs, Dir, File, Path', Rel, basename, fromRelFile, toFilePath)
+import StrongPath (Abs, Dir, File, Path', Rel, fromRelFile, toFilePath)
+import Validation (Validation (..), eitherToValidation)
+import Wasp.ExternalConfig.TsConfig (TsConfigFile, parseTsConfigFile)
 import qualified Wasp.ExternalConfig.TsConfig as T
-import Wasp.Project.Common
-  ( SrcTsConfigFile,
-    WaspProjectDir,
-    findFileInWaspProjectDir,
-  )
-import Wasp.Util (indent)
-import qualified Wasp.Util.IO as IOUtil
-import Wasp.Util.Json (parseJsonWithComments)
+import Wasp.Project.Common (CompileError, WaspProjectDir, findFileInWaspProjectDir)
+import qualified Wasp.Validator as V
 
-readSrcTsConfigFile ::
+parseAndValidateTsConfigFile ::
+  (TsConfigFile f) =>
+  V.Validator T.TsConfig ->
   Path' Abs (Dir WaspProjectDir) ->
-  Path' (Rel WaspProjectDir) (File SrcTsConfigFile) ->
-  IO (Either String T.TsConfig)
-readSrcTsConfigFile waspDir srcTsConfigPath = runExceptT $ do
-  tsConfigFileContents <- ExceptT findTsConfigOrError
-  ExceptT $ readTsConfigFile tsConfigFileContents
+  Path' (Rel WaspProjectDir) (File f) ->
+  IO (Validation [CompileError] T.TsConfig)
+parseAndValidateTsConfigFile validator waspDir tsConfigPathInProject =
+  fmap eitherToValidation . runExceptT $ do
+    absTsConfigPath <- withExceptT (: []) $ ExceptT absTsConfigPathOrError
+    tsConfigContents <- withExceptT (: []) $ ExceptT $ parseTsConfigFile absTsConfigPath
+    case validateTsConfig validator tsConfigFileName tsConfigContents of
+      [] -> return tsConfigContents
+      errors -> liftEither $ Left errors
   where
-    findTsConfigOrError = maybeToEither fileNotFoundMessage <$> findFileInWaspProjectDir waspDir srcTsConfigPath
-    fileNotFoundMessage = "Couldn't find the tsconfig.json file in the " ++ toFilePath waspDir ++ " directory"
+    absTsConfigPathOrError = maybeToEither fileNotFoundMessage <$> findFileInWaspProjectDir waspDir tsConfigPathInProject
+    fileNotFoundMessage = "Couldn't find " ++ tsConfigFileName ++ " in the " ++ toFilePath waspDir ++ " directory"
+    tsConfigFileName = fromRelFile tsConfigPathInProject
 
-readTsConfigFile :: Path' Abs (File SrcTsConfigFile) -> IO (Either String T.TsConfig)
-readTsConfigFile tsConfigFile = do
-  tsConfigContent <- IOUtil.readFileBytes tsConfigFile
-  parseResult <- parseJsonWithComments . BS.toString $ tsConfigContent
-  return $ left ((errorMessagePrefix ++) . indent 2) parseResult
-  where
-    errorMessagePrefix = "Failed to parse '" ++ baseTsConfigFilePath ++ "':\n"
-    baseTsConfigFilePath = fromRelFile (basename tsConfigFile)
+validateTsConfig :: V.Validator T.TsConfig -> String -> T.TsConfig -> [CompileError]
+validateTsConfig validator tsConfigFileName tsConfigContents =
+  show <$> V.execValidator (V.withFileName tsConfigFileName validator) tsConfigContents

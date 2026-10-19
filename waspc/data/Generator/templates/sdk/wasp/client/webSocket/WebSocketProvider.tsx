@@ -1,12 +1,12 @@
 {{={= =}=}}
-import { createContext, useState, useEffect, Context } from 'react'
-import { io, Socket } from 'socket.io-client'
+import { createContext, useState, useEffect, type Context, type ReactNode } from 'react'
+import { io, type Socket } from 'socket.io-client'
+import { apiEventsEmitter } from '@wasp.sh/lib-sdk-core/browser'
 
-import { getSessionId } from 'wasp/client/api'
-import { apiEventsEmitter } from 'wasp/api/events'
-import { config } from 'wasp/client'
+import { getSessionId } from '../../api/index.js'
+import { config } from '../index.js'
 
-import type { ClientToServerEvents, ServerToClientEvents } from 'wasp/server/webSocket';
+import type { ClientToServerEvents, ServerToClientEvents } from '../../server/webSocket/index.js';
 
 export type WebSocketContextValue = {
   socket: typeof socket
@@ -20,7 +20,7 @@ export const socket: Socket<ServerToClientEvents, ClientToServerEvents> = io(
   config.apiUrl,
   {
     transports: ['websocket'],
-    autoConnect: {= autoConnect =},
+    autoConnect: {= autoConnect =} && !import.meta.env.SSR,
   }
 )
 
@@ -48,10 +48,16 @@ export const WebSocketContext: Context<WebSocketContextValue> = createContext<We
 });
 
 // PRIVATE API
-export function WebSocketProvider({ children }: { children: JSX.Element }) {
-  const [isConnected, setIsConnected] = useState(socket.connected)
+export function WebSocketProvider({ children }: { children: ReactNode }) {
+  const [isConnected, setIsConnected] = useState(
+    // Our hooks need to be SSR-safe, and WebSockets don't work on the server,
+    // so we should start with `false` and then update it on the client.
+    false
+  )
 
   useEffect(() => {
+    setIsConnected(socket.connected)
+
     function onConnect() {
       setIsConnected(true)
     }

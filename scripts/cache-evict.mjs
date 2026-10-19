@@ -2,7 +2,7 @@
 
 // This script is intended to be run in a GitHub Actions workflow to delete
 // orphaned caches that are no longer associated with any remote refs.
-// Called from `.github/workflows/cache-evict.yml`.
+// Called from `.github/workflows/automation-cache-evict.yaml`.
 
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
@@ -17,20 +17,20 @@ function deleteOrphanedCaches(/** @type {string} */ githubRepository) {
   const cachesToDelete = ghCaches.filter((cache) => !remoteRefs.has(cache.ref));
   console.log(`Found ${cachesToDelete.length} caches to delete`);
 
-  for (const { key, ref } of cachesToDelete) {
-    deleteGitHubCache(key, ref);
+  for (const cache of cachesToDelete) {
+    deleteGitHubCache(cache);
   }
 
   console.log("Done");
 }
 
 function listGitHubCaches() {
-  const ghCachesOutput = /** @type {{ key: string, ref: string }[]} */ (
+  const ghCachesOutput = /** @type {GitHubCache[]} */ (
     JSON.parse(
       runCmd(
-        // We ask for the output to be a JSON array of {key, ref} objects.
+        // We ask for the output to be a JSON array of {id, key, ref} objects.
         "gh",
-        ["cache", "list", "--limit", "100", "--json", "key,ref"],
+        ["cache", "list", "--limit", "1000", "--json", "id,key,ref"],
       ),
     )
   );
@@ -38,7 +38,7 @@ function listGitHubCaches() {
   return ghCachesOutput;
 }
 
-function listRemoteRefs(githubRepository) {
+function listRemoteRefs(/** @type {string} */ githubRepository) {
   const parsedLsRemoteOutput = parseGitRemoteOutput(
     runCmd(
       // We use `git ls-remote` so we also receive refs such as `refs/pull/123/head`
@@ -56,13 +56,12 @@ function listRemoteRefs(githubRepository) {
   return remoteRefs;
 }
 
-function deleteGitHubCache(
-  /** @type {string} */ key,
-  /** @type {string} */ ref,
-) {
+/** @typedef {{ id: number, key: string, ref: string }} GitHubCache */
+
+function deleteGitHubCache(/** @type {GitHubCache} */ { id, key, ref }) {
   try {
-    console.group(`Deleting cache "${key}" for ref "${ref}"`);
-    runCmd("gh", ["cache", "delete", key], { collectStdout: false });
+    console.group(`Deleting cache "${key}" for ref "${ref}" (${id})`);
+    runCmd("gh", ["cache", "delete", String(id)], { collectStdout: false });
     console.log(`Done`);
   } catch (e) {
     console.warn(`::warning::Failed to delete cache key ${key}`);

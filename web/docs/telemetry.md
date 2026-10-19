@@ -1,6 +1,4 @@
----
-title: Telemetry
----
+# Telemetry
 
 ## Overview
 
@@ -14,7 +12,7 @@ Our telemetry implementation is anonymized and very limited in its scope, focuse
 ## When and what is sent?
 
 - Information is sent via HTTPS request when `wasp` CLI command is invoked.
-  Information is sent no more than twice in a period of 12 hours (sending is paused for 12 hours after last invocation, separately for `wasp build` command and for all other commands). Exact information as it is sent:
+  Information is sent no more than three times in a period of 12 hours (sending is paused for 12 hours after the last attempt to send it, separately for `wasp build` command, for `wasp deploy` command, and for all other commands). Exact information as it is sent:
 
   ```json
   {
@@ -25,10 +23,11 @@ Our telemetry implementation is anonymized and very limited in its scope, focuse
     // True if command was `wasp build`, false otherwise.
     "is_build": true,
     // Captures `wasp deploy ...` args, but only those from the limited, pre-defined list of keywords.
-    // Those are "fly", "railway", "setup", "create-db", "deploy", "cmd", and "launch". Everything else is ommited.
+    // Those are "fly", "railway", "setup", "create-db", "deploy", "cmd", and "launch". Everything else is omitted.
     "deploy_cmd_args": "fly;deploy",
     "wasp_version": "0.1.9.1",
     "os": "linux",
+    "arch": "x86_64",
     // "CI" if running on CI, and whatever is the content of "WASP_TELEMETRY_CONTEXT" env var.
     // We use this to track when execution is happening in some special context, like on Gitpod, Replit or similar.
     "context": "CI"
@@ -41,6 +40,18 @@ Our telemetry implementation is anonymized and very limited in its scope, focuse
     // Randomly generated id.
     "distinct_id": "274701613078193779564259",
     "os": "linux"
+  }
+  ```
+
+- Information is also sent once via HTTPS request when the `wasp` npm package is installed (postinstall hook). Exact information as it is sent:
+  ```json
+  {
+    // Randomly generated id.
+    "distinct_id": "274701613078193779564259",
+    "os": "linux",
+    "arch": "x86_64",
+    // "CI" if running on CI, empty string otherwise.
+    "context": "CI"
   }
   ```
 

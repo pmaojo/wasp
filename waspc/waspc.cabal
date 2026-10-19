@@ -176,61 +176,11 @@ library
     Wasp.AI.OpenAI
     Wasp.AI.OpenAI.ChatGPT
     Wasp.AI.Provider
-    Wasp.Analyzer
-    Wasp.Analyzer.AnalyzeError
-    Wasp.Analyzer.ErrorMessage
-    Wasp.Analyzer.Evaluator
-    Wasp.Analyzer.Evaluator.Bindings
-    Wasp.Analyzer.Evaluator.Evaluation
-    Wasp.Analyzer.Evaluator.Evaluation.Combinators
-    Wasp.Analyzer.Evaluator.Evaluation.Internal
-    Wasp.Analyzer.Evaluator.Evaluation.TypedDictExpr
-    Wasp.Analyzer.Evaluator.Evaluation.TypedDictExpr.Combinators
-    Wasp.Analyzer.Evaluator.Evaluation.TypedExpr
-    Wasp.Analyzer.Evaluator.Evaluation.TypedExpr.Combinators
-    Wasp.Analyzer.Evaluator.EvaluationError
-    Wasp.Analyzer.Parser
-    Wasp.Analyzer.Parser.AST
-    Wasp.Analyzer.Parser.AST.PrettyPrinter
     Wasp.Analyzer.Parser.Ctx
-    Wasp.Analyzer.Parser.ConcreteParser
-    Wasp.Analyzer.Parser.ConcreteParser.ParseError
-    Wasp.Analyzer.Parser.CST
-    Wasp.Analyzer.Parser.CST.Traverse
-    Wasp.Analyzer.Parser.ConcreteParser.ParserLib
-    Wasp.Analyzer.Parser.Lexer
-    Wasp.Analyzer.Parser.Lexer.Lexer
-    Wasp.Analyzer.Parser.Lexer.Internal
-    Wasp.Analyzer.Parser.ParseError
-    Wasp.Analyzer.Parser.PrettyPrinter
-    Wasp.Analyzer.Parser.AbstractParser
-    Wasp.Analyzer.Parser.AbstractParser.Monad
     Wasp.Analyzer.Parser.SourceOffset
     Wasp.Analyzer.Parser.SourcePosition
     Wasp.Analyzer.Parser.SourceRegion
     Wasp.Analyzer.Parser.SourceSpan
-    Wasp.Analyzer.Parser.Token
-    Wasp.Analyzer.Parser.TokenSet
-    Wasp.Analyzer.Parser.Valid
-    Wasp.Analyzer.StdTypeDefinitions
-    Wasp.Analyzer.StdTypeDefinitions.App.Dependency
-    Wasp.Analyzer.StdTypeDefinitions.Entity
-    Wasp.Analyzer.Type
-    Wasp.Analyzer.TypeChecker
-    Wasp.Analyzer.TypeChecker.AST
-    Wasp.Analyzer.TypeChecker.Internal
-    Wasp.Analyzer.TypeChecker.Monad
-    Wasp.Analyzer.TypeChecker.TypeError
-    Wasp.Analyzer.TypeDefinitions
-    Wasp.Analyzer.TypeDefinitions.Class.HasCustomEvaluation
-    Wasp.Analyzer.TypeDefinitions.Class.IsDeclType
-    Wasp.Analyzer.TypeDefinitions.Class.IsEnumType
-    Wasp.Analyzer.TypeDefinitions.Internal
-    Wasp.Analyzer.TypeDefinitions.TH
-    Wasp.Analyzer.TypeDefinitions.TH.Common
-    Wasp.Analyzer.TypeDefinitions.TH.Decl
-    Wasp.Analyzer.TypeDefinitions.TH.Enum
-    Wasp.Analyzer.Prisma
     Wasp.AppComponentUrl
     Wasp.AppSpec
     Wasp.AppSpec.Action
@@ -704,7 +654,6 @@ test-suite waspc-tests
     Project.WaspignoreTest
     Project.DbTest
     Paths_waspc
-    Generator.NpmDependenciesTest
     JsImportTest
     StudioDataTest
     AuthMethodsTest

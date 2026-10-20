@@ -1,3 +1,4 @@
+import Link from "next/link";
 import useCliRuns from "../hooks/useCliRuns";
 
 export default function CliRunList() {
@@ -6,10 +7,11 @@ export default function CliRunList() {
     <ul>
       {runs.map((r) => (
         <li key={r.id}>
-          <code>
-            {r.command} {r.args.join(" ")}
-          </code>{" "}
-          → {r.exitCode}
+          <Link href={`/cli-runs/${r.id}`}>
+            <code>
+              {r.command} {r.args.join(" ")}
+            </code>
+          </Link>{" "}→ {r.exitCode}
         </li>
       ))}
     </ul>
